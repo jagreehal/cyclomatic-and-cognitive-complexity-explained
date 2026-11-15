@@ -1,0 +1,476 @@
+{
+  "scores": [
+    {
+      "example": "01-nested-vs-flat",
+      "functionName": "flat",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 3
+    },
+    {
+      "example": "01-nested-vs-flat",
+      "functionName": "nested",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 6
+    },
+    {
+      "example": "02-modified-switch",
+      "functionName": "statusLabelIfElse",
+      "modified": 6,
+      "classic": 6,
+      "cognitive": 5
+    },
+    {
+      "example": "02-modified-switch",
+      "functionName": "statusLabelModified",
+      "modified": 2,
+      "classic": 6,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "03-early-returns",
+      "functionName": "canEditGuards",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 3
+    },
+    {
+      "example": "03-early-returns",
+      "functionName": "canEditNested",
+      "modified": 5,
+      "classic": 5,
+      "cognitive": 7
+    },
+    {
+      "example": "04-deep-nesting",
+      "functionName": "scoreShipment",
+      "modified": 5,
+      "classic": 5,
+      "cognitive": 13
+    },
+    {
+      "example": "04-deep-nesting",
+      "functionName": "scoreShipmentFlat",
+      "modified": 5,
+      "classic": 5,
+      "cognitive": 4
+    },
+    {
+      "example": "05-boolean-chains",
+      "functionName": "eligibleAnd",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "05-boolean-chains",
+      "functionName": "eligibleMixed",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 3
+    },
+    {
+      "example": "05-boolean-chains",
+      "functionName": "eligibleNestedIf",
+      "modified": 5,
+      "classic": 5,
+      "cognitive": 6
+    },
+    {
+      "example": "05-boolean-chains",
+      "functionName": "eligibleOr",
+      "modified": 5,
+      "classic": 5,
+      "cognitive": 2
+    },
+    {
+      "example": "06-exhaustive-error-switch",
+      "functionName": "describePaymentError",
+      "modified": 3,
+      "classic": 7,
+      "cognitive": 3
+    },
+    {
+      "example": "06-exhaustive-error-switch",
+      "functionName": "describePaymentErrorIfs",
+      "modified": 7,
+      "classic": 7,
+      "cognitive": 7
+    },
+    {
+      "example": "07-class-methods",
+      "functionName": "quote",
+      "modified": 7,
+      "classic": 7,
+      "cognitive": 10
+    },
+    {
+      "example": "07-class-methods",
+      "functionName": "simpleFee",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": 2
+    },
+    {
+      "example": "13-loops-and-catch",
+      "functionName": "findFirstMatch",
+      "modified": 6,
+      "classic": 6,
+      "cognitive": 9
+    },
+    {
+      "example": "13-loops-and-catch",
+      "functionName": "parseNumbers",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 5
+    },
+    {
+      "example": "13-loops-and-catch",
+      "functionName": "sumPositive",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": 3
+    },
+    {
+      "example": "14-ternaries",
+      "functionName": "tierFlat",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 3
+    },
+    {
+      "example": "14-ternaries",
+      "functionName": "tierNested",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 5
+    },
+    {
+      "example": "15-optional-chaining",
+      "functionName": "cityLabel",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "15-optional-chaining",
+      "functionName": "marketingEligible",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "callbackWithBranch",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "defaultParameter",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "elseIf",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": 2
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "forLoop",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "ifElse",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": 2
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "ifStatement",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "logicalAnd",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "logicalAssignment",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "logicalChain",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "logicalOr",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "nullishCoalescing",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "optionalChaining",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "straightLine",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "switchFourCases",
+      "modified": 2,
+      "classic": 5,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "ternary",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "tryCatch",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "tryFinally",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "whileLoop",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "17-false-positives",
+      "functionName": "createChart",
+      "modified": 12,
+      "classic": 12,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "17-false-positives",
+      "functionName": "deliveryCity",
+      "modified": 11,
+      "classic": 11,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "17-false-positives",
+      "functionName": "signupErrors",
+      "modified": 12,
+      "classic": 12,
+      "cognitive": 11
+    },
+    {
+      "example": "17-false-positives",
+      "functionName": "statusCode",
+      "modified": 2,
+      "classic": 12,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "canRefundInline",
+      "modified": 11,
+      "classic": 11,
+      "cognitive": 9
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "canRefundNamed",
+      "modified": 4,
+      "classic": 4,
+      "cognitive": 3
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "coveredByWarranty",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": 2
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "processPaymentTable",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "shippingZoneLadder",
+      "modified": 11,
+      "classic": 11,
+      "cognitive": 10
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "shippingZoneLookup",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "withinReturnWindow",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": 2
+    }
+  ],
+  "ratchets": [
+    {
+      "example": "08-ratchet-worsen",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "applyDiscount",
+          "metric": "cyclomatic",
+          "previous": 7,
+          "current": 16,
+          "kind": "worsened"
+        }
+      ]
+    },
+    {
+      "example": "09-ratchet-improve",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "10-ratchet-new-hot",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "routeOrder",
+          "metric": "cyclomatic",
+          "current": 12,
+          "kind": "new"
+        },
+        {
+          "functionName": "routeOrder",
+          "metric": "cognitive",
+          "current": 21,
+          "kind": "new"
+        }
+      ]
+    },
+    {
+      "example": "11-ratchet-cold-rise",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "12-ratchet-mixed",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "19-ratchet-false-positive",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "createChart",
+          "metric": "cyclomatic",
+          "current": 12,
+          "kind": "new"
+        }
+      ]
+    },
+    {
+      "example": "20-ratchet-override",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "21-ratchet-loophole-disable",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "22-ratchet-arrow-tracked",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "applyDiscount",
+          "metric": "cyclomatic",
+          "previous": 16,
+          "current": 21,
+          "kind": "worsened"
+        },
+        {
+          "functionName": "applyDiscount",
+          "metric": "cognitive",
+          "previous": 14,
+          "current": 19,
+          "kind": "worsened"
+        }
+      ]
+    },
+    {
+      "example": "23-ratchet-loophole-slice",
+      "pass": true,
+      "regressions": []
+    },
+    {
+      "example": "24-ratchet-nesting",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "shippingTier",
+          "metric": "cognitive",
+          "previous": 5,
+          "current": 19,
+          "kind": "worsened"
+        }
+      ]
+    }
+  ]
+}
