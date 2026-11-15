@@ -100,14 +100,14 @@
     },
     {
       "example": "07-class-methods",
-      "functionName": "quote",
+      "functionName": "PricingEngine.quote",
       "modified": 7,
       "classic": 7,
       "cognitive": 10
     },
     {
       "example": "07-class-methods",
-      "functionName": "simpleFee",
+      "functionName": "PricingEngine.simpleFee",
       "modified": 3,
       "classic": 3,
       "cognitive": 2
@@ -167,6 +167,13 @@
       "modified": 1,
       "classic": 1,
       "cognitive": "≤1"
+    },
+    {
+      "example": "16-what-counts",
+      "functionName": "callbackWithBranch>values.map()",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": 2
     },
     {
       "example": "16-what-counts",
@@ -338,9 +345,135 @@
     },
     {
       "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"flagged-intl-review\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"flagged-review\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"flagged-vip-review\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"intl-large\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"intl\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"invalid-amount\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"large\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"medium\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"refund-intl\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"refund-large\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"refund\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"unsupported-currency\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"vip-intl\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"vip-large\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"vip-refund-large\"]",
+      "modified": 3,
+      "classic": 3,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"vip-refund\"]",
+      "modified": 2,
+      "classic": 2,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "PAYMENT_RULES[\"vip\"]",
+      "modified": 1,
+      "classic": 1,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
       "functionName": "processPaymentTable",
       "modified": 3,
       "classic": 3,
+      "cognitive": "≤1"
+    },
+    {
+      "example": "18-refactoring-toolkit",
+      "functionName": "processPaymentTable>PAYMENT_RULES.find()",
+      "modified": 1,
+      "classic": 1,
       "cognitive": "≤1"
     },
     {
@@ -431,8 +564,16 @@
     },
     {
       "example": "21-ratchet-loophole-disable",
-      "pass": true,
-      "regressions": []
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "applyDiscount",
+          "metric": "cognitive",
+          "previous": 14,
+          "current": 19,
+          "kind": "worsened"
+        }
+      ]
     },
     {
       "example": "22-ratchet-arrow-tracked",
@@ -468,6 +609,19 @@
           "metric": "cognitive",
           "previous": 5,
           "current": 19,
+          "kind": "worsened"
+        }
+      ]
+    },
+    {
+      "example": "25-ratchet-override-holds",
+      "pass": false,
+      "regressions": [
+        {
+          "functionName": "createChart",
+          "metric": "cyclomatic",
+          "previous": 12,
+          "current": 13,
           "kind": "worsened"
         }
       ]

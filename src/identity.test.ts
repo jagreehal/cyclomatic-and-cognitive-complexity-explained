@@ -3,8 +3,7 @@ import {
   functionKey,
   normalizePath,
   parseFunctionName,
-  variableNameBefore,
-} from './identity';
+} from './identity.js';
 
 describe('identity', () => {
   it('builds a stable file::name key', () => {
@@ -26,17 +25,5 @@ describe('identity', () => {
       'processPayment',
     );
     expect(parseFunctionName('Arrow function')).toBeUndefined();
-  });
-
-  it('names arrow functions and function expressions from their variable', () => {
-    const at = (src: string, marker: string) => {
-      const bytes = Buffer.from(src);
-      return variableNameBefore(bytes, bytes.indexOf(marker));
-    };
-    expect(at('export const applyDiscount = (a) => a;', '(a)')).toBe('applyDiscount');
-    expect(at('const f: Handler = async (a) => a;', 'async')).toBe('f');
-    expect(at('let g = function () {};', 'function')).toBe('g');
-    expect(at('// £ é\nconst h = () => 1;', '()')).toBe('h');
-    expect(at('items.map((a) => a);', '(a)')).toBeUndefined();
   });
 });

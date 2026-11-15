@@ -4,8 +4,8 @@ import {
   findUntracked,
   passesComplexityGate,
   type FunctionSnapshot,
-} from './gate';
-import { functionKey } from './identity';
+} from './gate.js';
+import { functionKey } from './identity.js';
 
 describe('passesComplexityGate', () => {
   it('allows new functions up to the threshold', () => {
@@ -45,6 +45,18 @@ describe('findRegressions with cognitive scores', () => {
     expect(findRegressions(snap(4), snap(4, 30))).toEqual([]); // base predates cognitive: nothing to compare
     expect(findRegressions(new Map(), snap(4, 16))).toEqual([
       expect.objectContaining({ metric: 'cognitive', kind: 'new', current: 16 }),
+    ]);
+  });
+});
+
+describe('findRegressions with approvals', () => {
+  it('skips only the approved function and metric', () => {
+    const head = new Map([
+      [functionKey('a.ts', 'f'), { filePath: 'a.ts', functionName: 'f', cyclomatic: 12, cognitive: 20 }],
+    ]);
+    const approved = new Set([`${functionKey('a.ts', 'f')}\0cyclomatic`]);
+    expect(findRegressions(new Map(), head, {}, approved)).toEqual([
+      expect.objectContaining({ metric: 'cognitive', current: 20 }),
     ]);
   });
 });

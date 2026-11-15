@@ -1,15 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import type { FunctionSnapshot } from './gate';
-import {
-  functionKey,
-  normalizePath,
-  parseFunctionName,
-  variableNameBefore,
-} from './identity';
+import type { FunctionSnapshot } from './gate.js';
+import { functionKey, normalizePath } from './identity.js';
+import { analyseFile } from './functions.js';
+import { sourceFiles } from './overrides.js';
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,22 +29,52 @@ type OxlintJson = {
   diagnostics?: OxlintDiagnostic[];
 };
 
-/** Collect per-function modified cyclomatic scores for a directory of TS/JS. */
-export async function collectFromDirectory(
-  directory: string,
-): Promise<Map<string, FunctionSnapshot>> {
+/** Collect cyclomatic and cognitive scores for every function under a directory. */
+export async function collectFromDirectory(directory: string): Promise<Snapshots> {
   const absDir = path.resolve(directory);
-  const results = runOxlint([absDir]);
-  return snapshotsFromDiagnostics(results, absDir, runBiomeCognitive([absDir]));
+  return collectFrom(absDir, sourceFiles(absDir));
 }
 
-export async function collectFromFiles(
-  filePaths: string[],
-): Promise<Map<string, FunctionSnapshot>> {
+export async function collectFromFiles(filePaths: string[]): Promise<Snapshots> {
   const absPaths = filePaths.map((p) => path.resolve(p));
-  const results = runOxlint(absPaths);
-  const commonRoot = longestCommonDirectory(absPaths);
-  return snapshotsFromDiagnostics(results, commonRoot, runBiomeCognitive(absPaths));
+  return collectFrom(longestCommonDirectory(absPaths), absPaths);
+}
+
+/**
+ * Turn every disable/ignore directive into an ordinary comment of the same length,
+ * so offsets stay put and no override can hide a function from measurement.
+ * Overrides decide what the gate enforces (see compare.ts), never what it measures.
+ */
+export function defuseDirectives(source: string): string {
+  return source
+    .replace(/\b(oxlint|eslint)-disable/g, '$1_disable')
+    .replace(/\bbiome-ignore/g, 'biome_ignore');
+}
+
+async function collectFrom(root: string, files: string[]): Promise<Snapshots> {
+  functionsByFile.clear();
+  // Nothing to measure (a base with no copy of a brand-new file): an empty, complete result.
+  if (files.length === 0) return new Snapshots();
+  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'complexity-ratchet-'));
+  try {
+    const copies: string[] = [];
+    for (const file of files) {
+      const dest = path.join(copy, path.relative(root, file));
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, defuseDirectives(fs.readFileSync(file, 'utf8')));
+      copies.push(dest);
+    }
+    const snapshots = snapshotsFromDiagnostics(runOxlint([copy]), copy, runBiomeCognitive([copy]));
+    for (const file of copies) {
+      const { errors } = parsed(file);
+      if (errors.length > 0) {
+        snapshots.problems.push(`${normalizePath(path.relative(copy, file))}: does not parse (${errors[0]})`);
+      }
+    }
+    return snapshots;
+  } finally {
+    fs.rmSync(copy, { recursive: true, force: true });
+  }
 }
 
 function oxlintBin(): string {
@@ -104,9 +132,14 @@ export function runBiomeCognitive(targets: string[]): CognitiveHit[] {
 /**
  * Give each Oxlint function the Biome score that falls inside it. When functions nest,
  * the innermost one wins, because Biome reports each function separately.
- * Returns one entry per span: the score, or undefined (Biome scored it 0 or 1).
+ * `scores` has one entry per span: the score, or undefined (Biome scored it 0 or 1).
+ * `unmatched` lists Biome scores that fit no function: a measurement problem.
  */
-export function assignCognitive(spans: FunctionSpan[], hits: CognitiveHit[]): Array<number | undefined> {
+export function assignCognitive(
+  spans: FunctionSpan[],
+  hits: CognitiveHit[],
+): { scores: Array<number | undefined>; unmatched: CognitiveHit[] } {
+  const unmatched: CognitiveHit[] = [];
   const scores: Array<number | undefined> = spans.map(() => undefined);
   const lineStarts = new Map<string, number[]>();
   const bytes = new Map<string, Buffer>();
@@ -141,12 +174,13 @@ export function assignCognitive(spans: FunctionSpan[], hits: CognitiveHit[]): Ar
       });
     }
     if (best !== -1) scores[best] = hit.score;
+    else unmatched.push(hit);
   }
-  return scores;
+  return { scores, unmatched };
 }
 
 function collectorConfigPath(): string {
-  return path.join(repoRoot, '.oxlintrc.json');
+  return path.join(repoRoot, 'config/oxlint-cyclomatic.json');
 }
 
 export function runOxlint(
@@ -176,49 +210,107 @@ export function runOxlint(
   }
 }
 
+type ParsedFile = { bytes: Buffer; byStart: Map<number, string>; errors: string[] };
+const functionsByFile = new Map<string, ParsedFile>();
+
+function parsed(absoluteFile: string): ParsedFile {
+  let entry = functionsByFile.get(absoluteFile);
+  if (!entry) {
+    const bytes = fs.readFileSync(absoluteFile);
+    const { functions, errors } = analyseFile(absoluteFile, bytes.toString('utf8'));
+    entry = { bytes, byStart: new Map(functions.map((f) => [f.start, f.name])), errors };
+    functionsByFile.set(absoluteFile, entry);
+  }
+  return entry;
+}
+
+/** Qualified name of the function Oxlint reports at this UTF-8 byte offset. */
+export function functionNameAt(absoluteFile: string, byteOffset: number): string | undefined {
+  const entry = parsed(absoluteFile);
+  // The parser counts UTF-16 code units; Oxlint counts bytes.
+  const charOffset = entry.bytes.subarray(0, byteOffset).toString('utf8').length;
+  return entry.byStart.get(charOffset);
+}
+
+/**
+ * Scores for every function, plus anything that could not be measured.
+ * A gate must treat a non-empty `problems` list as a failure: an unmeasured
+ * function is not evidence that the function is fine.
+ */
+export class Snapshots extends Map<string, FunctionSnapshot> {
+  problems: string[] = [];
+}
+
+type Scored = { snap: FunctionSnapshot; span: FunctionSpan };
+
+/** One Oxlint diagnostic: a scored function, a measurement problem, or nothing to measure. */
+function readDiagnostic(
+  diagnostic: OxlintDiagnostic,
+  rootDir: string,
+): Scored | { problem: string } | undefined {
+  const match = diagnostic.code?.includes('complexity') ? diagnostic.message.match(COMPLEXITY_RE) : null;
+  if (!match?.groups) return undefined;
+
+  const absolute = diagnostic.filename ? path.resolve(repoRoot, diagnostic.filename) : rootDir;
+  const span = diagnostic.labels?.[0]?.span;
+  const filePath = relativeTo(rootDir, absolute);
+  // Oxlint names some functions (`method \`quote\``) and not others (arrows, callbacks).
+  // The parser names all of them, qualified by class, object or enclosing function.
+  const functionName = span?.offset === undefined ? undefined : functionNameAt(absolute, span.offset);
+  if (functionName) {
+    return {
+      snap: { filePath, functionName, cyclomatic: Number(match.groups.score), line: span?.line },
+      span: { file: absolute, offset: span?.offset ?? -1, length: span?.length ?? 0 },
+    };
+  }
+  // Oxlint also scores class field initialisers that are not functions (`x = a ? 1 : 2`): those
+  // belong to no function. A file that does not parse is reported once, by collectFrom.
+  if (match.groups.label.startsWith('class field initializer') || parsed(absolute).errors.length > 0) {
+    return undefined;
+  }
+  return { problem: `${filePath}:${span?.line ?? '?'}: Oxlint scored ${match.groups.label} but no function was found there` };
+}
+
+function relativeTo(rootDir: string, absolute: string): string {
+  const relative = normalizePath(path.relative(rootDir, absolute));
+  return relative === '' ? path.basename(absolute) : relative;
+}
+
 export function snapshotsFromDiagnostics(
   diagnostics: OxlintDiagnostic[],
   rootDir: string,
   cognitiveHits?: CognitiveHit[],
-): Map<string, FunctionSnapshot> {
-  const found: Array<{ snap: FunctionSnapshot; span: FunctionSpan }> = [];
+): Snapshots {
+  const snapshots = new Snapshots();
+  const found: Scored[] = [];
+  const seen = new Set<string>();
 
   for (const diagnostic of diagnostics) {
-    if (!diagnostic.code?.includes('complexity')) continue;
-    const match = diagnostic.message.match(COMPLEXITY_RE);
-    if (!match?.groups) continue;
-
-    const absolute = diagnostic.filename
-      ? path.resolve(repoRoot, diagnostic.filename)
-      : rootDir;
-    const span = diagnostic.labels?.[0]?.span;
-    // Oxlint labels `const fn = () => {}` as plain "function"; recover the name from the source.
-    const functionName =
-      parseFunctionName(match.groups.label) ??
-      (span?.offset === undefined
-        ? undefined
-        : variableNameBefore(fs.readFileSync(absolute), span.offset));
-    if (!functionName) continue;
-
-    const relative = normalizePath(path.relative(rootDir, absolute));
-    found.push({
-      snap: {
-        filePath: relative === '' ? path.basename(absolute) : relative,
-        functionName,
-        cyclomatic: Number(match.groups.score),
-      },
-      span: { file: absolute, offset: span?.offset ?? -1, length: span?.length ?? 0 },
-    });
+    const read = readDiagnostic(diagnostic, rootDir);
+    if (!read) continue;
+    if ('problem' in read) {
+      snapshots.problems.push(read.problem);
+      continue;
+    }
+    // Oxlint reports a class field arrow twice (as the field and as the method): keep one.
+    const at = `${read.span.file}:${read.span.offset}`;
+    if (seen.has(at)) continue;
+    seen.add(at);
+    found.push(read);
   }
 
   if (cognitiveHits) {
-    const scores = assignCognitive(found.map((f) => f.span), cognitiveHits);
+    const { scores, unmatched } = assignCognitive(found.map((f) => f.span), cognitiveHits);
     found.forEach((f, i) => {
       f.snap.cognitive = scores[i] ?? 1;
     });
+    for (const hit of unmatched) {
+      snapshots.problems.push(
+        `${relativeTo(rootDir, hit.file)}:${hit.line}: Biome scored cognitive ${hit.score} for a function the collector could not find`,
+      );
+    }
   }
 
-  const snapshots = new Map<string, FunctionSnapshot>();
   for (const { snap } of found) snapshots.set(functionKey(snap.filePath, snap.functionName), snap);
   return snapshots;
 }

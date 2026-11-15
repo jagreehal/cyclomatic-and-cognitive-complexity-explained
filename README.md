@@ -11,8 +11,9 @@ change risks breaking a case nobody remembered to test.
 
 You can measure that drift. Two numbers do most of the work:
 
-- **Cyclomatic complexity** counts the separate paths through a function. It tells
-  you how many tests you need to try every path.
+- **Cyclomatic complexity** counts the decisions a function makes: every `if`,
+  `&&`, loop and so on. More decisions mean more cases to test, so it gives you a
+  rough measure of testing effort.
 - **Cognitive complexity** scores how hard a function is to read, and it climbs
   fastest when code nests `if` inside `if` inside `if`.
 
@@ -36,9 +37,9 @@ The team also runs **CI** (continuous integration: a server that checks every pu
 request automatically) with a **linter** (a tool that reads code and reports
 problems) and a complexity rule switched on. CI passes.
 
-Yet `processPayment` went from **19 paths to 24**, and its reading cost went from
-**28 to 38**. Five more cases now need tests, and the function got noticeably
-harder to follow.
+Yet `processPayment`'s cyclomatic score went from **19 to 24** (five new
+decisions), and its cognitive score went from **28 to 38**. There are more cases
+to test, and the function got noticeably harder to follow.
 
 CI missed it because of how the team adopted the rule. Their old code already had
 functions over the limit, so they recorded those existing failures as accepted
@@ -47,8 +48,11 @@ of over-limit functions in each file went up. `processPayment` was already over
 the limit, so it could get worse forever without changing the count.
 
 This repo contains that exact pull request, plus a small tool, a **ratchet**, that
-catches it. A ratchet compares every function's scores with the same function on
-the main branch. A function may get better or stay the same. It may not get worse.
+catches it. The ratchet compares every function's scores with the same function on
+the main branch and applies three rules: a function already over the limit may not
+get worse, a function under the limit may grow up to it, and a new function must
+stay under it. Because the main branch is the baseline, every improvement becomes
+the function's new ceiling (never lower than the threshold).
 
 | Check | What it compares | Result on the express-delivery PR |
 |-------|------------------|-----------------------------------|
@@ -90,7 +94,7 @@ this up for a team? Parts 2, 3, 5 and 6 are for you.
 | CI | Continuous integration: a server that runs checks on every pull request and blocks it if one fails |
 | Quality gate | A check in CI that must pass before code can merge |
 | Bulk suppressions | A file listing the rule failures that existed when you turned a rule on, so the linter only fails on new ones |
-| Ratchet | A gate that allows a score to improve or stay the same, never to get worse |
+| Ratchet | Here, a threshold-aware ratchet: a function over the limit may not get worse, one under the limit may grow up to it, and a new one must stay under it |
 | Regression | A change that makes something worse. Here: a function's score went up |
 | False positive | A rule failure on code that is fine as written |
 | Override | A comment that switches a rule off for one function, such as `// oxlint-disable-next-line complexity` |
@@ -139,13 +143,36 @@ export function createOrder(itemCount: number, member: boolean): string {
 1 + 4 = **5**. Oxlint agrees.
 
 The `&&` counts because `member && itemCount > 10` hides a second decision: when
-`member` is false, JavaScript never evaluates the right-hand side. That is a
-separate path through the function.
+`member` is false, JavaScript never evaluates the right-hand side.
 
-The number has a concrete meaning. A score of 5 means five *linearly independent*
-paths, and basis path testing needs one test per path to walk all of them. At 24,
-`processPayment` needs 24. Branch coverage needs fewer, which is one reason
-[100% branch coverage can still miss faults](https://github.com/jagreehal/100-percent-test-coverage-is-false-hope).
+### What the number means, and what it does not
+
+Cyclomatic complexity does **not** count every possible route through a function.
+Two independent `if`s show the difference:
+
+```ts
+function example(a: boolean, b: boolean) {
+  if (a) doA();
+  if (b) doB();
+}
+```
+
+The score is 3. There are four ways to run it: neither, only `a`, only `b`, both.
+McCabe's number counts *linearly independent* paths, a minimal set that every
+other path can be built from. Every decision you add doubles the possible routes
+in the worst case, but adds only 1 to the score.
+
+So read the score as a measure of **decision complexity** and an indication of
+testing effort, not as an exact test count:
+
+- Some independent paths cannot happen, because one condition depends on
+  another. You cannot test those.
+- The *modified* variant used here counts a whole `switch` as one decision, so
+  it under-counts the cases a `switch` creates on purpose (see "Classic versus
+  modified" below).
+
+Branch coverage, by comparison, can be satisfied with fewer tests still, which is
+one reason [100% branch coverage can still miss faults](https://github.com/jagreehal/100-percent-test-coverage-is-false-hope).
 
 ### What costs a point
 
@@ -203,7 +230,7 @@ repo uses modified everywhere.
 
 ### Cognitive complexity: count what the reader holds in their head
 
-Cyclomatic complexity counts paths. It ignores how you arrange them. These two
+Cyclomatic complexity counts decisions. It ignores how you arrange them. These two
 functions from `examples/04-deep-nesting` both score 5:
 
 ```ts
@@ -260,7 +287,7 @@ at all.
 
 The two metrics answer different questions:
 
-- **Cyclomatic**: how many tests do I need to walk every path?
+- **Cyclomatic**: how many decisions does it make, and so roughly how much testing does it need?
 - **Cognitive**: how hard is this to read?
 
 Where they disagree, look closer. Most false positives in Part 3 sit in exactly
@@ -274,8 +301,8 @@ supplies the cognitive one, because Oxlint does not compute cognitive complexity
 
 | Example | Function | Modified | Classic | Cognitive | Lesson |
 |---------|----------|---------:|--------:|----------:|--------|
-| `01-nested-vs-flat` | `nested` | 4 | 4 | 6 | Nesting costs readers, not paths |
-| `01-nested-vs-flat` | `flat` | 4 | 4 | 3 | Same paths, guard clauses |
+| `01-nested-vs-flat` | `nested` | 4 | 4 | 6 | Nesting costs readers, not decisions |
+| `01-nested-vs-flat` | `flat` | 4 | 4 | 3 | Same decisions, guard clauses |
 | `02-modified-switch` | `statusLabelModified` | 2 | 6 | ≤1 | `switch` is one decision under modified |
 | `02-modified-switch` | `statusLabelIfElse` | 6 | 6 | 5 | The same mapping as `if`s |
 | `03-early-returns` | `canEditNested` | 5 | 5 | 7 | Nested permission checks |
@@ -288,14 +315,14 @@ supplies the cognitive one, because Oxlint does not compute cognitive complexity
 | `05-boolean-chains` | `eligibleNestedIf` | 5 | 5 | 6 | The same as nested `if`s |
 | `06-exhaustive-error-switch` | `describePaymentError` | 3 | 7 | 3 | Discriminated union `switch` |
 | `06-exhaustive-error-switch` | `describePaymentErrorIfs` | 7 | 7 | 7 | The same errors as `if`s |
-| `07-class-methods` | `quote` | 7 | 7 | 10 | Methods count like functions |
-| `07-class-methods` | `simpleFee` | 3 | 3 | 2 | A small method |
+| `07-class-methods` | `PricingEngine.quote` | 7 | 7 | 10 | Methods count like functions |
+| `07-class-methods` | `PricingEngine.simpleFee` | 3 | 3 | 2 | A small method |
 | `13-loops-and-catch` | `sumPositive` | 3 | 3 | 3 | Loop with an `if` |
 | `13-loops-and-catch` | `parseNumbers` | 4 | 4 | 5 | Loop with `try`/`catch` |
 | `13-loops-and-catch` | `findFirstMatch` | 6 | 6 | 9 | Ternaries inside a loop |
 | `14-ternaries` | `tierNested` | 4 | 4 | 5 | Nested ternaries |
 | `14-ternaries` | `tierFlat` | 4 | 4 | 3 | The same tiers as `if`s |
-| `15-optional-chaining` | `cityLabel` | 3 | 3 | ≤1 | `?.` adds paths |
+| `15-optional-chaining` | `cityLabel` | 3 | 3 | ≤1 | Each `?.` is a decision |
 | `15-optional-chaining` | `marketingEligible` | 4 | 4 | ≤1 | `?.` with `&&` |
 
 ---
@@ -308,7 +335,7 @@ ratchet scenarios in `examples/`.
 ### A gate on cyclomatic alone misses nesting
 
 `examples/24-ratchet-nesting` rewrites a flat function as nested `if`s. Same
-inputs, same answers, same paths:
+inputs, same answers, same decisions:
 
 ```ts
 // base: guard clauses                     // head: the same logic, nested
@@ -331,13 +358,13 @@ export function shippingTier(s) {         export function shippingTier(s) {
 
 | Metric | Before | After | Verdict alone |
 |--------|-------:|------:|---------------|
-| Cyclomatic | 6 | 6 | Pass: no new paths |
+| Cyclomatic | 6 | 6 | Pass: no new decisions |
 | Cognitive | 5 | **19** | **Fail**: new and over 15 |
 
 Coding agents produce this shape often: each new condition goes one level
 deeper than the last. A cyclomatic gate approves every one of those PRs.
 
-### A gate on cognitive alone misses new paths
+### A gate on cognitive alone misses new decisions
 
 `examples/08-ratchet-worsen` adds an `employee` flag to `applyDiscount`, as a flat
 list of `if`s:
@@ -348,14 +375,14 @@ list of `if`s:
 | Cognitive | 6 | 14 | Pass: still under 15 |
 
 The function still reads top to bottom, so cognitive stays under its limit. It
-also has nine more paths, and nine more cases somebody has to test. A cognitive
+also makes nine more decisions, each one a case somebody has to test. A cognitive
 gate approves it.
 
 ### What each metric is for
 
 | | Cyclomatic | Cognitive |
 |---|---|---|
-| Question it answers | How many tests do I need to cover every path? | How hard is this to read and change? |
+| Question it answers | How many decisions does it make, and roughly how much testing does it need? | How hard is this to read and change? |
 | Grows with | Every decision: `if`, `&&`, `?.`, `??`, defaults, `case` (classic) | Breaks in flow, weighted by nesting depth |
 | Ignores | Nesting | `?.`, `??`, defaults, runs of the same operator |
 | Typical false positive | Option defaults, `?.` chains (Part 3) | Rare. Flat checklists stay below 15 |
@@ -472,7 +499,7 @@ gate fails on one thing: a *new* violation. The PR's new file `refunds.ts` has
 one (`createRefund` at 14), so Oxlint does flag that file. The two functions that
 got worse pass.
 
-**Step 4. The cost.** Five more paths means five more tests to cover them.
+**Step 4. The cost.** Five more decisions means more cases to test.
 Cognitive complexity went from 28 to 38, double the cyclomatic rise, because each
 new `if` sits one or two levels deep. The reviewer saw six short lines.
 
@@ -507,8 +534,9 @@ are still under their thresholds. `validateCustomer`'s cognitive score went from
 
 ### The ratchet's four rules
 
-The same rules apply to each metric separately, with a threshold of **10** for
-cyclomatic and **15** for cognitive:
+It is a *threshold-aware* ratchet: below the threshold, scores may rise. The same
+rules apply to each metric separately, with a threshold of **10** for cyclomatic
+and **15** for cognitive:
 
 1. A new function must score at or under the threshold.
 2. An existing function over the threshold may not get worse.
@@ -556,7 +584,7 @@ The ratchet needs no baseline file at all. The target branch *is* the baseline.
 - **Fix every violation first, then turn the rule on.** This works for a 20-file
   project. On anything bigger, the cleanup never finishes and the rule never turns on.
 - **Rely on code review.** The reviewer approved six readable lines. Nobody
-  reviews a diff by recounting the paths in the function around it.
+  reviews a diff by recounting the decisions in the function around it.
 
 ### More ratchet scenarios
 
@@ -683,9 +711,10 @@ Ask four questions:
 1. **Where does the score come from?** If cyclomatic is high and cognitive sits
    near zero, the decisions are flat: defaults, `?.`, `??`, a `switch`. That is
    the strongest signal.
-2. **Would each path need its own test?** `processPayment`'s 24 paths are 24
-   business outcomes, and each one needs a test. `createChart`'s 12 paths are
-   "the caller left out `width`", and one test of the defaults covers them.
+2. **Would each decision need its own test?** `processPayment`'s decisions lead
+   to different business outcomes, and each one needs a test. `createChart`'s 11
+   decisions are all "the caller left out `width`" (or `height`, or …), and one
+   test of the defaults covers them.
 3. **Do the decisions interact?** Independent lines are cheap to read. A
    condition that depends on an earlier one is the expensive kind.
 4. **Is the alternative better, or only lower?** If the refactor is longer,
@@ -712,8 +741,10 @@ cognitive score usually means real nesting.
 
 The rules:
 
-- **Next line only.** Never a file-wide `/* oxlint-disable */`. That hides every
-  future function in the file too.
+- **Next line only.** The ratchet only accepts `disable-next-line`,
+  `disable-line` and `biome-ignore` (not `-all` or `-start`) as approving a
+  function. A file-wide `/* oxlint-disable */` approves nothing: the gate keeps
+  enforcing every function in the file and lists the comment for a reviewer.
 - **Always a reason.** "Legacy" and "will fix later" are not reasons. A reason
   describes why *this shape* is the right one.
 - **Never raise a threshold for the whole repo** to fit one function.
@@ -740,8 +771,8 @@ charts.ts
 Quality gate failed.
 ```
 
-With the override, it passes, and the report names the override so a reviewer
-reads the reason:
+With the override, it passes, and the report names the function, the metric,
+the approved score and the reason, so a reviewer can accept or reject it:
 
 ```bash
 pnpm complexity-ratchet compare \
@@ -753,17 +784,39 @@ pnpm complexity-ratchet compare \
 No complexity regressions detected.
 Quality gate passed.
 
-Warning: new complexity overrides. The overridden rule stops measuring these functions:
-  charts.ts:20  // oxlint-disable-next-line complexity -- options bag: each default is one line, no logic
-Check each reason. "Legacy" or "will fix later" is not one.
+Approved by a new override. A reviewer must accept each reason:
+  charts.ts::createChart cyclomatic 12
+    line 20: // oxlint-disable-next-line complexity -- options bag: each default is one line, no logic
+Still measured: if one of these gets worse in a later PR, the gate fails.
 ```
 
-Know what an override costs. An Oxlint disable comment stops Oxlint reporting
-the function at all, so the ratchet loses **both** scores for it, and Biome's
-cognitive score has no function to attach to. A `biome-ignore` comment hides the
-cognitive score only. Either way, if `createChart` grows a nested `if` next
-year, nothing fails. An override is a permanent exemption, and Part 5 shows the
-same exemption used to hide a regression.
+### An override approves a score. It does not stop measurement.
+
+An override changes what the gate *enforces* for one function on one metric. It
+never changes what the ratchet *measures*. The ratchet lints a copy of your code
+with every disable comment turned into a plain comment, so overridden functions
+keep both scores. Then:
+
+- **The PR that adds the override** approves the function's current score on
+  that metric. Here: `createChart` at cyclomatic 12.
+- **Every later PR** compares against that score like any other function.
+  Adding one more default takes `createChart` from 12 to 13, and the gate fails
+  (`examples/25-ratchet-override-holds`):
+
+  ```text
+  charts.ts
+    createChart
+      cyclomatic: 12 → 13 (+1)
+
+  Quality gate failed.
+  ```
+
+- **The other metric stays enforced.** An Oxlint comment approves cyclomatic
+  only; a `biome-ignore` comment approves cognitive only. `createChart` still
+  fails if its cognitive score climbs past 15.
+
+Your editor and lint runs still honour the comment as normal, so the underline
+goes away. Only the ratchet keeps counting.
 
 ---
 
@@ -793,13 +846,32 @@ measures cognitive too.
 ### 2. A `switch` over a union
 
 If you are testing one value against several constants, use a `switch`. Under
-modified complexity it costs 1, and TypeScript checks you handled every member of
-the union:
+modified complexity the whole `switch` costs 1.
 
 | Function | Modified |
 |----------|---------:|
 | `describePaymentErrorIfs` → `describePaymentError` | 7 → 3 |
 | `statusLabelIfElse` → `statusLabelModified` | 6 → 2 |
+
+TypeScript checks that you handled every member of the union only in some cases.
+These examples return a value from every `case` and declare a return type, so
+leaving a case out is a compile error (TS2366: the function can reach its end
+without returning). A `switch` that runs side effects and returns nothing gets no
+such check. Add a `never` check to make the compiler enforce it:
+
+```ts
+switch (event.type) {
+  case 'created': audit.push('created'); break;
+  case 'deleted': audit.push('deleted'); break;
+  default: {
+    // A new event type makes this assignment a compile error.
+    const unhandled: never = event;
+    throw new Error(`Unhandled event: ${JSON.stringify(unhandled)}`);
+  }
+}
+```
+
+The `default` adds nothing to the modified score.
 
 ### 3. A lookup table
 
@@ -813,10 +885,14 @@ export function shippingZoneLadder(country: string): string {
   return 'rest-of-world';
 }
 
-const SHIPPING_ZONES: Record<string, string> = { GB: 'domestic', IE: 'eu', /* … */ };
+const SHIPPING_ZONES = new Map<string, string>([
+  ['GB', 'domestic'],
+  ['IE', 'eu'],
+  // … eight more …
+]);
 
 export function shippingZoneLookup(country: string): string {
-  return SHIPPING_ZONES[country] ?? 'rest-of-world';
+  return SHIPPING_ZONES.get(country) ?? 'rest-of-world';
 }
 ```
 
@@ -824,7 +900,12 @@ export function shippingZoneLookup(country: string): string {
 |----------|---------:|----------:|
 | `shippingZoneLadder` → `shippingZoneLookup` | 11 → 2 | 10 → ≤1 |
 
-Adding a country now means adding a line of data, with no new path to test.
+Adding a country now means adding a line of data, with no new decision to test.
+
+Use a `Map`, or check `Object.hasOwn` first. With a plain object literal,
+`SHIPPING_ZONES['constructor']` returns `Object`'s constructor function instead of
+`'rest-of-world'`, because the lookup finds inherited properties. The test for
+this example includes `constructor`, `toString` and `__proto__` for that reason.
 
 ### 4. Named predicates
 
@@ -880,17 +961,23 @@ export function processPaymentTable(payment: Payment): string {
 | `processPayment` (nested) | 19 | 28 |
 | `processPaymentTable` | 3 | ≤1 |
 
-`examples/refactoring.test.ts` runs both versions against 432 payments, every
-combination of nine amounts, three currencies and four flags, and they agree on
-all of them.
+`examples/refactoring.test.ts` runs both versions against 432 payments: every
+combination of nine chosen amounts (including each boundary), three currencies and
+the four flags. They agree on all of them. That is strong evidence the refactor
+kept behaviour, not a proof for every possible input; pick test values at and
+either side of each threshold in the code.
 
 Each outcome now sits on one line next to its condition. Adding express delivery
 means adding rows, and a reviewer can read every rule without tracking nesting.
 
-The trade has a cost. Each rule is an anonymous arrow function in an array, so
-the ratchet stops measuring each condition. That is fine while each
-rule fits on one line. If a rule grows a block body with its own `if`s, give it a
-name so the ratchet can see it.
+The ratchet still measures each rule, and names it by its key:
+`PAYMENT_RULES["flagged-vip-review"]`. A rule that grows its own nested `if`s is
+held to the same limits as any function, and reordering the table or inserting a
+rule cannot pair one rule with another rule's history. Give table entries a key
+(a string first element, or an `id`, `key`, `name` or `outcome` property) for that
+reason. Entries without one are named by position (`RULES[3]`), and inserting an
+entry then shifts every name after it: the gate compares each function with
+whatever used to sit at its position.
 
 ### 6. Push uncertainty to the edge
 
@@ -919,27 +1006,44 @@ pricing: five more branches, taking it to 21 and 19.
 export function applyDiscount(
 ```
 
-Oxlint stops reporting the function, so the ratchet loses both scores and the
-gate passes. The report says why:
+The comment approves the new cyclomatic score of 21. It does not hide the
+function, so the cognitive gate still runs, and cognitive went from 14 to 19:
 
 ```text
-No complexity regressions detected.
-Quality gate passed.
+Complexity regressions detected:
 
-Warning: over the threshold on base, no longer measured on head:
-  checkout.ts::applyDiscount (was cyclomatic 16, cognitive 14)
-Deleted or renamed is fine. A new disable comment needs a reviewer.
+checkout.ts
+  applyDiscount
+    cognitive: 14 → 19 (+5)
 
-Warning: new complexity overrides. The overridden rule stops measuring these functions:
-  checkout.ts:2  // oxlint-disable-next-line complexity -- legacy, will refactor later
-Check each reason. "Legacy" or "will fix later" is not one.
+Quality gate failed.
+
+Approved by a new override. A reviewer must accept each reason:
+  checkout.ts::applyDiscount cyclomatic 21
+    line 2: // oxlint-disable-next-line complexity -- legacy, will refactor later
+Still measured: if one of these gets worse in a later PR, the gate fails.
 ```
 
-The comment works the same way as the honest override in Part 3. The only
-difference is the reason, and the tool cannot judge reasons. So the ratchet
-warns instead of failing, and lists every new override, whether Oxlint, ESLint
-or `biome-ignore`, with its file, line and text. A reviewer reads two lines and
-decides. Failing the build on every override would block the honest ones too.
+Measuring both metrics closed half of this loophole. By default the other half
+stays open: add a `biome-ignore` comment as well and the PR passes, because the
+tool cannot judge reasons. It puts every approval in front of a reviewer with the
+function, metric, score and reason, and keeps measuring afterwards so the
+approval covers this score and no later one.
+
+A reviewer reading the report is a convention, not an enforcement boundary, and
+neither are agent hooks. To make approval enforceable, run the gate with
+`--require-override-approval`. Then a new override approves nothing; it fails the
+gate:
+
+```text
+New overrides need approval (--require-override-approval):
+  checkout.ts:2  // oxlint-disable-next-line complexity -- legacy, will refactor later
+
+Quality gate failed.
+```
+
+Part 6, Step 4 shows how to drop the flag only when someone with the right
+permissions approves the PR, using a protected label.
 
 ### Slicing
 
@@ -962,6 +1066,7 @@ function applyDiscountContinued(total, vip, coupon, employee, blackFriday) {
 | `applyDiscount` | 16 → 13 | 14 → 11 |
 | `applyDiscountContinued` | new → 9 | new → 8 |
 | **Total** | **16 → 22** | **14 → 19** |
+| **Decisions** (cyclomatic − 1 per function) | **15 → 20** | |
 
 `applyDiscount` improved on both metrics, and the new function sits under both
 limits. The ratchet passes with no warning. Every branch from the original is
@@ -972,15 +1077,31 @@ Compare with named predicates in Part 4. `withinReturnWindow` is a concept with 
 name you could put in a spec. `applyDiscountContinued` is page two. No metric
 tells those apart. A reviewer asking "what is this function *for*?" does.
 
-### Arrow functions (fixed, and worth checking in your tool)
+### Hiding from the identity (fixed, and worth checking in your tool)
 
-Oxlint reports `const applyDiscount = () => {}` as plain "function", with no
-name. The first version of this tool keyed on the name, so converting a function
-to an arrow made it invisible. That is a big hole in TypeScript codebases, where
-arrow functions are everywhere.
+The ratchet matches a function across commits by its name. Anything it cannot
+name, it cannot compare. Oxlint reports `const applyDiscount = () => {}` as plain
+"function", and a method as `validate` with no class. An early version of this
+tool used those labels, so converting a function to an arrow made it invisible,
+and two classes with a `validate` method in one file collided.
 
-The collector now reads the variable name from the source, and
-`examples/22-ratchet-arrow-tracked` proves the conversion gets caught:
+The collector now parses each file with
+[`oxc-parser`](https://www.npmjs.com/package/oxc-parser) and gives every
+function a qualified name:
+
+| Code | Name |
+|------|------|
+| `export function processPayment()` | `processPayment` |
+| `export const applyDiscount = () => …` | `applyDiscount` |
+| `class PaymentService { validate() {} }` | `PaymentService.validate` |
+| `const handlers = { onSubmit() {} }` | `handlers.onSubmit` |
+| A `const helper` inside `createChart` | `createChart>helper` |
+| `items.map((i) => …)` inside `render` | `render>items.map()` |
+| The rule in `['flagged-vip-review', (p) => …]` inside `PAYMENT_RULES` | `PAYMENT_RULES["flagged-vip-review"]` |
+| The fourth entry of `const RULES = [fn, fn, fn, fn]` (no keys) | `RULES[3]` |
+
+`examples/22-ratchet-arrow-tracked` converts `applyDiscount` to an arrow
+function while making it worse, and the gate catches it:
 
 ```text
 checkout.ts
@@ -991,22 +1112,30 @@ checkout.ts
 Quality gate failed.
 ```
 
-Whatever tool you use, find out which functions it cannot see. Run Oxlint with
-`max: 0` and look for diagnostics without a name.
+Callbacks are named by the call they are passed to, numbered when one function
+has two of the same (`items.forEach()#2`). Swapping two identical calls swaps
+their numbers, so the gate compares each callback with the other one's history.
+Keep that in mind when a report names a callback you did not touch.
+
+Whatever tool you use, find out which functions it cannot name. Those are the
+functions it cannot hold to a ratchet.
 
 ### What the loopholes have in common
 
 The ratchet checks two numbers per function. Anything that moves complexity out
-of a measured function, into an exemption or into a new function under the
+of a measured function, into an approved score or into a new function under the
 limits, passes. A suppression count has the same flaw at file level, and this
 gate has it at function level.
 
 Two things close most of the gap:
 
-- **Track total paths per file**, the sum of every function's score, as a
-  warning beside the per-function gate. Slicing took `checkout.ts` from 16 to 22.
-  Total *excess* above the threshold misses it: 6 before, 3 + 0 = 3 after. This
-  repo does not implement either yet.
+- **Track total decisions per file**, the sum of each function's score minus 1,
+  as a warning beside the per-function gate. Subtracting 1 matters: every
+  function starts at 1, so a plain sum rises whenever you extract a function,
+  even one that adds no decisions. Slicing took `checkout.ts` from 15 decisions
+  to 20, exactly the five Black Friday branches. Total *excess* above the
+  threshold misses it: 6 before, 3 + 0 = 3 after. This repo does not implement
+  either yet.
 - **Review the shape, not the score.** Numbers are worth having. A person
   reading the diff is still the only check that knows what the code is for.
 
@@ -1020,7 +1149,7 @@ Four layers, each with one job. All of them use both metrics.
 |-------|------|--------------|-----------|
 | 1. Editor | Oxlint (cyclomatic) and Biome (cognitive), set to `warn` | Underlines a complex function while you type | No |
 | 2. Pull request gate | `complexity-ratchet` | Compares every function's two scores with the target branch | **Yes** |
-| 3. Review | The ratchet's warnings | Lists new overrides and functions that stopped being measured | No: a person decides |
+| 3. Review | The ratchet's report | Lists each new override as an approval (function, metric, score, reason) and any function that went missing | No: a person decides |
 | 4. Coding agents | Agent instructions, plus Claude Code hooks that run the ratchet on every edit | Catches a regression, or a new override, in the same turn the agent wrote it | No: it blocks the agent, not CI |
 
 The linters run at `warn` because the ratchet is the gate. A linter at `error`
@@ -1114,8 +1243,19 @@ Options:
 |------|--------:|---------|
 | `--threshold` | 10 | Maximum cyclomatic score for new functions |
 | `--cognitive-threshold` | 15 | Maximum cognitive score for new functions |
+| `--require-override-approval` | off | A new override fails the gate instead of approving a score (Step 4) |
 
-Exit code 0 means pass, 1 means a regression, 2 means bad arguments.
+The command has three outcomes, and only the first one passes:
+
+| Outcome | Exit code |
+|---------|----------:|
+| Every function measured, no regressions | 0 |
+| Every function measured, at least one regression (or a blocked override in strict mode) | 1 |
+| Something could not be measured: a file that does not parse, a function the collector cannot name, a cognitive score it cannot place | 3 |
+
+Exit code 2 means bad arguments, and 4 means the tool itself failed. Treat any
+non-zero code as a failure. An unmeasured function is not evidence that the
+function is fine, so the gate fails closed.
 
 ### Step 4: Gate pull requests in CI
 
@@ -1143,12 +1283,47 @@ jobs:
       - run: pnpm oxlint src && pnpm biome lint src
 
       # The gate: every function's two scores against the target branch.
-      - run: git worktree add ../base origin/${{ github.base_ref }}
+      # Pin the exact commit the PR targets, not a branch name that can move mid-run.
+      - run: git worktree add ../base ${{ github.event.pull_request.base.sha }}
       - run: pnpm complexity-ratchet compare --base ../base/src --head src
 ```
 
-The ratchet prints its warnings (new overrides, functions that disappeared) in
-the same output. Ask reviewers to read that block on every PR that has one.
+The ratchet prints approvals (new overrides) and warnings (missing functions,
+file-wide overrides) in the same output. Ask reviewers to read that block on every
+PR that has one. Make the job a required status check, so a failure blocks merging.
+
+#### Strict mode: overrides need an approval the author cannot grant
+
+In the workflow above, anyone who can push a commit can add an override, and the
+gate accepts it. Agent hooks stop well-behaved agents, but a hook runs on the
+author's machine, so it is not an enforcement boundary. For that, run the gate
+with `--require-override-approval` and drop the flag only when a PR carries a
+label that the author cannot add:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# … same steps as above, then replace the last step with:
+      - name: Complexity ratchet
+        env:
+          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'complexity-override-approved') }}
+        run: |
+          if [ "$APPROVED" = "true" ]; then
+            pnpm complexity-ratchet compare --base ../base/src --head src
+          else
+            pnpm complexity-ratchet compare --base ../base/src --head src --require-override-approval
+          fi
+```
+
+For the label to mean anything:
+
+- Only people who can triage the repo can add labels. Keep coding agents and
+  their tokens below that permission.
+- A label covers every commit pushed to the PR after it was added. Re-read the
+  report on each push, or add a workflow that removes the label on `synchronize`.
+- The `labeled` and `unlabeled` types re-run the check when the label changes.
 
 ### Step 5: Choose thresholds
 
@@ -1170,9 +1345,11 @@ people do. Paste this into `AGENTS.md`, `CLAUDE.md` or your tool's equivalent:
 ```markdown
 ## Complexity
 
-CI fails a PR when any function gets worse on cyclomatic complexity (limit 10
-for new code) or cognitive complexity (limit 15 for new code), compared with
-the target branch.
+CI compares every function's cyclomatic complexity (limit 10) and cognitive
+complexity (limit 15) with the target branch, and fails the PR when:
+- a new function is over a limit,
+- a function already over a limit gets any worse, or
+- a function under a limit grows past it.
 
 - Never add `oxlint-disable`, `eslint-disable` or `biome-ignore` comments for
   complexity rules. If you believe a score is a false positive, stop and ask.
@@ -1198,12 +1375,13 @@ committed version, using the ratchet you installed in Step 1.
 
 | Hook | When it runs | What it checks |
 |------|--------------|----------------|
-| `PostToolUse` | After every Edit or Write | The file just changed, in about a second |
+| `PostToolUse` | After every Edit or Write | The file Claude changed, in about a second |
 | `Stop` | When Claude is about to hand back | Every changed source file in the working tree |
 
 Each one blocks the agent (exit code 2, report on stderr) when:
 
-- a function got worse on cyclomatic or cognitive complexity,
+- a function over a limit got worse, or one under a limit crossed it,
+- a changed file cannot be measured (usually because it does not parse yet),
 - a new function is over a limit, or
 - the change adds a complexity override comment. Agents may not add those. If an
   override is right, a person commits it, and the hook stops flagging it once
@@ -1275,10 +1453,15 @@ both metrics:
 
 For each tree, the CLI runs Oxlint with `max: 0`, so every function produces a
 diagnostic with its cyclomatic score, and Biome with a maximum of 1, so every
-function scoring 2 or more reports its cognitive score. It pairs each Biome score
-with the Oxlint function whose source range contains it, keys each function as
-`relative/path::name`, and compares the base map with the head map. It also scans
-both trees for complexity override comments and reports the new ones.
+function scoring 2 or more reports its cognitive score. Both run on a copy of the
+code with disable comments defused, so overrides never hide a score. It pairs
+each Biome score with the Oxlint function whose source range contains it, names
+each function with `oxc-parser` (`relative/path::PaymentService.validate`), and
+compares the base map with the head map. New override comments become approvals
+for one function and one metric, listed in the report, or failures under
+`--require-override-approval`. Anything it cannot measure (a file that does not
+parse, a score it cannot pair with a named function) fails the run with exit
+code 3.
 
 ```mermaid
 flowchart LR
@@ -1289,7 +1472,7 @@ flowchart LR
   C --> D{Any function worse on either,<br/>or new and over a limit?}
   D -->|yes| F[Fail]
   D -->|no| P[Pass]
-  C --> W[Warn: new overrides,<br/>functions no longer measured]
+  C --> W[Report: approvals from new overrides,<br/>missing functions]
 ```
 
 ```bash
@@ -1319,29 +1502,31 @@ README, then `pnpm examples:write`.
 
 ## Limits
 
-- **Identity is `relative/path::name`.** Moving a function to another file, or
-  renaming it, makes it look new. Two functions with the same name in one file
-  (two inner `const helper = () => …`, say) collide.
-- **Anonymous functions in arrays, callbacks and default exports** have no name,
-  so the ratchet skips them. Arrow functions assigned to a variable are named
-  from the variable. A type annotation that contains `=`
-  (`const f: (a: A) => B = …`) defeats that lookup.
+- **Identity is `relative/path::qualified name`.** Moving a function to another
+  file, or renaming it, makes it look new, so it must pass the new-function
+  limits. Callbacks and unkeyed array entries are named by position
+  (`items.forEach()#2`, `RULES[3]`), so reordering them pairs a function with
+  another function's history. Keyed table entries do not have this problem.
 - **Biome never reports cognitive scores of 0 or 1**, so the ratchet records both
   as 1. The examples tables show them as ≤1.
-- **Overrides remove measurement.** An Oxlint disable comment hides both scores;
-  `biome-ignore` hides the cognitive score. The report lists every new override
-  and every hot function that disappeared, and passes. A person decides.
+- **The ratchet cannot judge an override's reason.** By default a new override
+  approves one function's current score on one metric, and the report lists it
+  for a reviewer, so a PR that adds both an Oxlint and a Biome override to the
+  same function passes. `--require-override-approval` turns every new override
+  into a failure; the approval then has to come from outside the PR (Step 4).
 - **The CLI compares directories or JSON snapshots.** It does not check out git
   refs itself; Part 6 shows the `git worktree` step. A JSON snapshot without
-  cognitive scores skips the cognitive gate, and override detection needs
+  cognitive scores skips the cognitive gate, and override approvals need
   directories.
 - **The ratchet uses its own collector configs**, so your `ignorePatterns` do not
   apply to it. Point it at folders without generated code.
+- **Class field initialisers that are not functions** (`x = a ? 1 : 2`) are not
+  measured. Oxlint scores them, but they belong to no function.
 
 ## Layout
 
 ```text
-src/                          the complexity-ratchet CLI: collect, gate, compare, report, overrides
+src/                          the complexity-ratchet CLI: collect, functions (naming), gate, compare, overrides, report
 scripts/measure.ts            modified, classic and cognitive scores for the examples
 .oxlintrc.json                cyclomatic collector config (max 0: every function reports a score)
 config/biome-cognitive.json   cognitive collector config (max 1, Biome's lowest)
@@ -1356,16 +1541,17 @@ examples/08-12                ratchet scenarios (Part 2)
 examples/17-false-positives   high scores worth keeping (Part 3)
 examples/18-refactoring-toolkit + refactoring.test.ts   refactors with equivalence tests (Part 4)
 examples/19-20                a false positive at the gate, and its override (Part 3)
-examples/21-23                loopholes, and the one this tool closed (Part 5)
+examples/21-23                loopholes: half closed, closed, still open (Part 5)
 examples/24-ratchet-nesting   the regression only cognitive catches (Why you need both)
+examples/25-ratchet-override-holds  an approved function that gets worse later still fails (Part 3)
 agent-hooks/claude-code/      Claude Code hooks that run the ratchet on every edit (Part 6, Step 7)
 examples/expected-results.json  every number on this page, checked in CI
 ```
 
 ## Where we started
 
-Express delivery is still in `processPayment`, five branches deep, at 24 paths
-and a cognitive score of 38. The suppressions file still says `"count": 2`, and
+Express delivery is still in `processPayment`, five branches deep, at a
+cyclomatic score of 24 and a cognitive score of 38. The suppressions file still says `"count": 2`, and
 that count is still correct. It answered the question it was built for: how many
 functions are over the line. The ratchet asks which function got worse, on which
 metric, and by how much.

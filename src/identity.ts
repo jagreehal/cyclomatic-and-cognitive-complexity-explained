@@ -20,19 +20,3 @@ export function parseFunctionName(label: string): string | undefined {
   return undefined;
 }
 
-const DECLARATOR_RE =
-  /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s+)?$/;
-
-/**
- * Name an anonymous function from the variable it is assigned to:
- * `const applyDiscount = (...) => {}` → "applyDiscount".
- * `offset` is Oxlint's UTF-8 byte offset of the function start.
- * shortcut: type annotations containing "=" (e.g. `const f: (a: A) => B = ...`) are not matched; use an AST if that matters.
- */
-export function variableNameBefore(
-  source: Uint8Array,
-  offset: number,
-): string | undefined {
-  const before = Buffer.from(source).subarray(Math.max(0, offset - 300), offset).toString('utf8');
-  return before.match(DECLARATOR_RE)?.[1];
-}

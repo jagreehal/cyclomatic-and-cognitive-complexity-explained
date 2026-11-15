@@ -20,21 +20,23 @@ export function shippingZoneLadder(country: string): string {
   return 'rest-of-world';
 }
 
-const SHIPPING_ZONES: Record<string, string> = {
-  GB: 'domestic',
-  IE: 'eu',
-  FR: 'eu',
-  DE: 'eu',
-  ES: 'eu',
-  IT: 'eu',
-  NL: 'eu',
-  US: 'americas',
-  CA: 'americas',
-  AU: 'apac',
-};
+// A Map, not an object literal: SHIPPING_ZONES['constructor'] on a plain object
+// returns Object's constructor function instead of falling through to the default.
+const SHIPPING_ZONES = new Map<string, string>([
+  ['GB', 'domestic'],
+  ['IE', 'eu'],
+  ['FR', 'eu'],
+  ['DE', 'eu'],
+  ['ES', 'eu'],
+  ['IT', 'eu'],
+  ['NL', 'eu'],
+  ['US', 'americas'],
+  ['CA', 'americas'],
+  ['AU', 'apac'],
+]);
 
 export function shippingZoneLookup(country: string): string {
-  return SHIPPING_ZONES[country] ?? 'rest-of-world';
+  return SHIPPING_ZONES.get(country) ?? 'rest-of-world';
 }
 
 // 2. Named predicates: a compound condition the reader has to decode.

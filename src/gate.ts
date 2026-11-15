@@ -1,4 +1,4 @@
-import { functionKey } from './identity';
+import { functionKey } from './identity.js';
 
 export const DEFAULT_CYCLOMATIC_THRESHOLD = 10;
 export const DEFAULT_COGNITIVE_THRESHOLD = 15;
@@ -25,6 +25,8 @@ export type FunctionSnapshot = {
   cyclomatic: number;
   /** Biome cognitive complexity. Absent in JSON snapshots that predate it: not gated. */
   cognitive?: number;
+  /** Line Oxlint reports the function on. Used to match override comments to functions. */
+  line?: number;
 };
 
 export type Regression = {
@@ -40,6 +42,12 @@ export type Regression = {
 export type GateOptions = {
   cyclomaticThreshold?: number;
   cognitiveThreshold?: number;
+  /**
+   * Strict mode: a new override approves nothing and fails the gate instead.
+   * Use it where approval has to come from somewhere an author cannot grant
+   * themselves, such as a protected PR label (README, Part 6).
+   */
+  requireOverrideApproval?: boolean;
 };
 
 export function thresholds(options: GateOptions = {}): Record<Metric, number> {
@@ -49,10 +57,16 @@ export function thresholds(options: GateOptions = {}): Record<Metric, number> {
   };
 }
 
+/**
+ * @param approved `functionKey\0metric` entries a new override approved on this PR.
+ *   Those skip the gate once. Measurement continues, so the next PR that makes
+ *   the function worse fails like any other.
+ */
 export function findRegressions(
   previous: Map<string, FunctionSnapshot>,
   current: Map<string, FunctionSnapshot>,
   options: GateOptions = {},
+  approved: ReadonlySet<string> = new Set(),
 ): Regression[] {
   const limits = thresholds(options);
   const regressions: Regression[] = [];
@@ -65,6 +79,7 @@ export function findRegressions(
       const now = head[metric];
       // A base snapshot without this metric (older JSON) gives nothing to compare against.
       if (now === undefined || (base && base[metric] === undefined)) continue;
+      if (approved.has(`${functionKey(head.filePath, head.functionName)}\0${metric}`)) continue;
       if (passesComplexityGate(base?.[metric], now, limits[metric])) continue;
       regressions.push({
         filePath: head.filePath,

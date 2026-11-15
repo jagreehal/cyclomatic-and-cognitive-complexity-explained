@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { collectFromDirectory, collectFromFiles } from './collect';
-import { functionKey } from './identity';
+import { collectFromDirectory, collectFromFiles } from './collect.js';
+import { functionKey } from './identity.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -17,13 +17,13 @@ describe('collectFromDirectory', () => {
     expect(
       snapshots.get(functionKey('payments.ts', 'processPayment'))?.cyclomatic,
     ).toBeTypeOf('number');
-    expect(snapshots.get(functionKey('payments.ts', 'nested'))).toEqual({
+    expect(snapshots.get(functionKey('payments.ts', 'nested'))).toMatchObject({
       filePath: 'payments.ts',
       functionName: 'nested',
       cyclomatic: 4,
       cognitive: 6,
     });
-    expect(snapshots.get(functionKey('payments.ts', 'flat'))).toEqual({
+    expect(snapshots.get(functionKey('payments.ts', 'flat'))).toMatchObject({
       filePath: 'payments.ts',
       functionName: 'flat',
       cyclomatic: 4,
@@ -55,6 +55,14 @@ export class K { m(a: boolean, b: boolean) { if (a) { if (b) return 1; } return 
     fs.rmSync(dir, { recursive: true, force: true });
 
     const cognitive = Object.fromEntries(snaps.map((s) => [s.functionName, s.cognitive]));
-    expect(cognitive).toEqual({ outer: 6, inner: 9, m: 3 });
+    expect(cognitive).toEqual({ outer: 6, 'outer>inner': 9, 'K.m': 3 });
+  });
+
+  it('returns an empty, complete result for a directory with no source files', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collect-empty-'));
+    const snaps = await collectFromDirectory(dir);
+    fs.rmSync(dir, { recursive: true, force: true });
+    expect(snaps.size).toBe(0);
+    expect(snaps.problems).toEqual([]);
   });
 });

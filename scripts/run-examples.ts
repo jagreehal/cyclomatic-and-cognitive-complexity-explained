@@ -5,10 +5,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory } from '../src/collect';
-import { comparePaths } from '../src/compare';
-import { formatReport } from '../src/report';
-import { measureDirectory } from './measure';
+import { collectFromDirectory } from '../src/collect.js';
+import { comparePaths, verdict } from '../src/compare.js';
+import { formatReport } from '../src/report.js';
+import { measureDirectory } from './measure.js';
 
 export const scoreExamples = [
   '01-nested-vs-flat',
@@ -38,6 +38,7 @@ export const ratchetExamples = [
   '22-ratchet-arrow-tracked',
   '23-ratchet-loophole-slice',
   '24-ratchet-nesting',
+  '25-ratchet-override-holds',
 ] as const;
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,7 +59,7 @@ export async function measureExamples() {
     );
     ratchets.push({
       example,
-      pass: result.regressions.length === 0,
+      pass: verdict(result) === 'pass',
       regressions: result.regressions.map((r) => ({
         functionName: r.functionName,
         metric: r.metric,
@@ -66,7 +67,7 @@ export async function measureExamples() {
         current: r.current,
         kind: r.kind,
       })),
-      report: formatReport(result.regressions, result.untracked, result.overrides),
+      report: formatReport(result),
     });
   }
   return { scores, ratchets };

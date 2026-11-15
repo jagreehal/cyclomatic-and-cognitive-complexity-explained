@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { measureExamples } from './run-examples';
+import { measureExamples } from './run-examples.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const expected = JSON.parse(

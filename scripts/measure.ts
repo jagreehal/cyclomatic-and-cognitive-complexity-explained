@@ -5,9 +5,15 @@
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assignCognitive, COMPLEXITY_RE, runBiomeCognitive, runOxlint, type FunctionSpan } from '../src/collect';
-import { parseFunctionName, variableNameBefore } from '../src/identity';
-import fs from 'node:fs';
+import {
+  assignCognitive,
+  COMPLEXITY_RE,
+  functionNameAt,
+  runBiomeCognitive,
+  runOxlint,
+  type FunctionSpan,
+} from '../src/collect.js';
+import { parseFunctionName } from '../src/identity.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -28,8 +34,8 @@ function oxlintScores(dir: string, config: string): Scored[] {
     if (!match?.groups || !d.filename || span?.line === undefined) return [];
     const file = path.resolve(root, d.filename);
     const name =
-      parseFunctionName(match.groups.label) ??
-      (span.offset === undefined ? undefined : variableNameBefore(fs.readFileSync(file), span.offset));
+      (span.offset === undefined ? undefined : functionNameAt(file, span.offset)) ??
+      parseFunctionName(match.groups.label);
     return [
       {
         at: `${file}:${span.offset}`,
@@ -46,8 +52,8 @@ export function measureDirectory(dir: string): Measurement[] {
   const classic = new Map(
     oxlintScores(abs, path.join(root, 'config/oxlint-classic.json')).map((s) => [s.at, s.score]),
   );
-  const modified = oxlintScores(abs, path.join(root, '.oxlintrc.json'));
-  const cognitive = assignCognitive(modified.map((s) => s.span), runBiomeCognitive([abs]));
+  const modified = oxlintScores(abs, path.join(root, 'config/oxlint-cyclomatic.json'));
+  const { scores: cognitive } = assignCognitive(modified.map((s) => s.span), runBiomeCognitive([abs]));
 
   return modified.flatMap((s, i) =>
     s.name === undefined

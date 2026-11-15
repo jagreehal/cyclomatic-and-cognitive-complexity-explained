@@ -1,34 +1,73 @@
-import type { FunctionSnapshot, Regression } from './gate';
-import type { Override } from './overrides';
+import type { FunctionSnapshot, Regression } from './gate.js';
+import type { Approval, Override } from './overrides.js';
 
 /** Format regressions the way the README / CI output quotes them. */
-export function formatReport(
-  regressions: Regression[],
-  untracked: FunctionSnapshot[] = [],
-  overrides: Override[] = [],
-): string {
-  const lines = [
-    regressions.length === 0
-      ? 'No complexity regressions detected.\nQuality gate passed.'
-      : formatRegressions(regressions),
-  ];
+export type ReportInput = {
+  regressions: Regression[];
+  untracked?: FunctionSnapshot[];
+  approvals?: Approval[];
+  unmatchedOverrides?: Override[];
+  blockedOverrides?: Override[];
+  incomplete?: string[];
+};
+
+export function formatReport({
+  regressions,
+  untracked = [],
+  approvals = [],
+  unmatchedOverrides = [],
+  blockedOverrides = [],
+  incomplete = [],
+}: ReportInput): string {
+  const lines: string[] = [];
+  if (regressions.length > 0) lines.push(formatRegressions(regressions), '');
+  if (blockedOverrides.length > 0) {
+    lines.push(
+      'New overrides need approval (--require-override-approval):',
+      ...blockedOverrides.map((o) => `  ${o.filePath}:${o.line}  ${o.text}`),
+      '',
+    );
+  }
+  if (incomplete.length > 0) {
+    lines.push(
+      'Measurement incomplete. The gate fails until every function can be measured:',
+      ...incomplete.map((p) => `  ${p}`),
+      '',
+    );
+  }
+
+  if (incomplete.length > 0 || regressions.length > 0 || blockedOverrides.length > 0) {
+    lines.push('Quality gate failed.');
+  } else {
+    lines.push('No complexity regressions detected.', 'Quality gate passed.');
+  }
+
+  if (approvals.length > 0) {
+    lines.push(
+      '',
+      'Approved by a new override. A reviewer must accept each reason:',
+      ...approvals.flatMap((a) => [
+        `  ${a.override.filePath}::${a.functionName} ${a.override.metric} ${a.score ?? '?'}`,
+        `    line ${a.override.line}: ${a.override.text}`,
+      ]),
+      'Still measured: if one of these gets worse in a later PR, the gate fails.',
+    );
+  }
+  if (unmatchedOverrides.length > 0) {
+    lines.push(
+      '',
+      'Warning: new overrides that sit on no single function (file-wide or misplaced). The gate ignores them:',
+      ...unmatchedOverrides.map((o) => `  ${o.filePath}:${o.line}  ${o.text}`),
+    );
+  }
   if (untracked.length > 0) {
     lines.push(
       '',
-      'Warning: over the threshold on base, no longer measured on head:',
+      'Warning: over a threshold on base, missing on head (deleted, renamed or moved):',
       ...untracked.map(
         (s) =>
           `  ${s.filePath}::${s.functionName} (was cyclomatic ${s.cyclomatic}${s.cognitive === undefined ? '' : `, cognitive ${s.cognitive}`})`,
       ),
-      'Deleted or renamed is fine. A new disable comment needs a reviewer.',
-    );
-  }
-  if (overrides.length > 0) {
-    lines.push(
-      '',
-      'Warning: new complexity overrides. The overridden rule stops measuring these functions:',
-      ...overrides.map((o) => `  ${o.filePath}:${o.line}  ${o.text}`),
-      'Check each reason. "Legacy" or "will fix later" is not one.',
     );
   }
   return lines.join('\n');
@@ -53,8 +92,7 @@ function formatRegressions(regressions: Regression[]): string {
     }
     lines.push('');
   }
-  lines.push('Quality gate failed.');
-  return lines.join('\n');
+  return lines.join('\n').trimEnd();
 }
 
 function formatMetric(reg: Regression): string {

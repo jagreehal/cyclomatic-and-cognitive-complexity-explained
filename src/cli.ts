@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-import { comparePaths } from './compare';
-import { formatReport } from './report';
+import { comparePaths, verdict } from './compare.js';
+import { formatReport } from './report.js';
+
+/** 0 pass, 1 regression, 2 bad arguments, 3 measurement incomplete, 4 the tool itself failed. */
+const EXIT = { pass: 0, fail: 1, incomplete: 3 } as const;
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -18,11 +21,11 @@ async function main(argv: string[]): Promise<number> {
   const result = await comparePaths(flags.base, flags.head, {
     cyclomaticThreshold: flags.cyclomaticThreshold,
     cognitiveThreshold: flags.cognitiveThreshold,
+    requireOverrideApproval: flags.requireOverrideApproval,
   });
 
-  const report = formatReport(result.regressions, result.untracked, result.overrides);
-  console.log(report);
-  return result.regressions.length === 0 ? 0 : 1;
+  console.log(formatReport(result));
+  return EXIT[verdict(result)];
 }
 
 function parseFlags(args: string[]): {
@@ -30,12 +33,14 @@ function parseFlags(args: string[]): {
   head?: string;
   cyclomaticThreshold?: number;
   cognitiveThreshold?: number;
+  requireOverrideApproval?: boolean;
 } {
   const out: {
     base?: string;
     head?: string;
     cyclomaticThreshold?: number;
     cognitiveThreshold?: number;
+    requireOverrideApproval?: boolean;
   } = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -53,6 +58,8 @@ function parseFlags(args: string[]): {
     ) {
       out.cyclomaticThreshold = Number(next);
       i++;
+    } else if (arg === '--require-override-approval') {
+      out.requireOverrideApproval = true;
     } else if (arg === '--cognitive-threshold' && next) {
       out.cognitiveThreshold = Number(next);
       i++;
@@ -69,9 +76,18 @@ Options:
   --threshold <n>              maximum modified cyclomatic for new functions (default 10)
   --cyclomatic-threshold <n>   alias for --threshold
   --cognitive-threshold <n>    maximum cognitive for new functions (default 15)
+  --require-override-approval  fail on any new override instead of treating it as an approval
+
+Exit codes: 0 pass, 1 regression, 2 bad arguments, 3 measurement incomplete, 4 tool error.
 
 Run from any directory; --base and --head resolve from where you run it.`);
 }
 
-const code = await main(process.argv.slice(2));
+let code: number;
+try {
+  code = await main(process.argv.slice(2));
+} catch (error) {
+  console.error(`complexity-ratchet failed: ${error instanceof Error ? error.message : String(error)}`);
+  code = 4;
+}
 process.exit(code);

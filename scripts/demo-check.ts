@@ -7,10 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory } from '../src/collect';
-import { comparePaths } from '../src/compare';
-import { formatReport } from '../src/report';
-import { functionKey } from '../src/identity';
+import { collectFromDirectory } from '../src/collect.js';
+import { comparePaths, verdict } from '../src/compare.js';
+import { formatReport } from '../src/report.js';
+import { functionKey } from '../src/identity.js';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,7 +107,7 @@ const failCompare = await comparePaths(
   path.join(root, 'fixtures/base'),
   path.join(root, 'fixtures/head-fail'),
 );
-const failReport = formatReport(failCompare.regressions);
+const failReport = formatReport(failCompare);
 for (const needle of [
   'processPayment\n    cyclomatic: 19 → 24 (+5)\n    cognitive: 28 → 38 (+10)',
   'validateCustomer\n    cyclomatic: 12 → 13 (+1)',
@@ -123,7 +123,7 @@ const passCompare = await comparePaths(
   path.join(root, 'fixtures/base'),
   path.join(root, 'fixtures/head-pass'),
 );
-if (passCompare.regressions.length !== 0) {
+if (verdict(passCompare) !== 'pass') {
   throw new Error('head-pass must have zero regressions');
 }
 
