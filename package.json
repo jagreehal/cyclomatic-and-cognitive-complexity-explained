@@ -21,7 +21,7 @@
     "examples:check": "tsx scripts/check-examples.ts"
   },
   "dependencies": {
-    "@biomejs/biome": "2.6.8",
+    "@biomejs/biome": "2.6.7",
     "oxlint": "^1.93.0",
     "tsx": "^4.23.15"
   },
