@@ -7,17 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory } from '../src/collect.js';
-import { comparePaths, verdict } from '../src/compare.js';
-import { formatReport } from '../src/report.js';
-import { functionKey } from '../src/identity.js';
+import { collectFromDirectory, comparePaths, formatReport, functionKey, verdict } from 'autoratchet';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const oxlint = path.join(
-  path.dirname(require.resolve('oxlint/package.json')),
-  'bin/oxlint',
-);
+const oxlint = path.join(path.dirname(require.resolve('oxlint/package.json')), 'bin/oxlint');
 
 // Cognitive scores the README quotes for the opening story.
 const expectedCognitive = {
@@ -54,15 +48,11 @@ function assertScores(
 ) {
   for (const [name, cyclomatic] of Object.entries(expected)) {
     const key =
-      name === 'createRefund'
-        ? functionKey('refunds.ts', name)
-        : functionKey(filePath, name);
+      name === 'createRefund' ? functionKey('refunds.ts', name) : functionKey(filePath, name);
     const actual = snapshots.get(key);
     if (!actual) throw new Error(`${label}: missing ${key}`);
     if (actual.cyclomatic !== cyclomatic) {
-      throw new Error(
-        `${label}: ${key} expected ${cyclomatic}, got ${actual.cyclomatic}`,
-      );
+      throw new Error(`${label}: ${key} expected ${cyclomatic}, got ${actual.cyclomatic}`);
     }
   }
 }
@@ -84,15 +74,11 @@ const base = await collectFromDirectory(path.join(root, 'fixtures/base'));
 assertScores('base', base, expectedBase, 'payments.ts');
 assertCognitive('base', base, expectedCognitive.base);
 
-const headFail = await collectFromDirectory(
-  path.join(root, 'fixtures/head-fail'),
-);
+const headFail = await collectFromDirectory(path.join(root, 'fixtures/head-fail'));
 assertScores('head-fail', headFail, expectedHeadFail, 'payments.ts');
 assertCognitive('head-fail', headFail, expectedCognitive.headFail);
 
-const headPass = await collectFromDirectory(
-  path.join(root, 'fixtures/head-pass'),
-);
+const headPass = await collectFromDirectory(path.join(root, 'fixtures/head-pass'));
 assertScores('head-pass', headPass, expectedHeadPass, 'payments.ts');
 
 const suppressions = JSON.parse(
@@ -128,29 +114,19 @@ if (verdict(passCompare) !== 'pass') {
 }
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'complexity-oxlint-check-'));
-fs.copyFileSync(
-  path.join(root, 'fixtures/head-fail/payments.ts'),
-  path.join(work, 'payments.ts'),
-);
+fs.copyFileSync(path.join(root, 'fixtures/head-fail/payments.ts'), path.join(work, 'payments.ts'));
 fs.copyFileSync(
   path.join(root, 'fixtures/oxlint-suppressions.json'),
   path.join(work, 'oxlint-suppressions.json'),
 );
-fs.copyFileSync(
-  path.join(root, 'oxlint.fixtures.json'),
-  path.join(work, '.oxlintrc.json'),
-);
+fs.copyFileSync(path.join(root, 'oxlint.fixtures.json'), path.join(work, '.oxlintrc.json'));
 const lint = spawnSync(process.execPath, [oxlint, 'payments.ts'], {
   cwd: work,
   encoding: 'utf8',
 });
 fs.rmSync(work, { recursive: true, force: true });
 if (lint.status !== 0) {
-  throw new Error(
-    `oxlint baseline check failed:\n${lint.stdout}\n${lint.stderr}`,
-  );
+  throw new Error(`oxlint baseline check failed:\n${lint.stdout}\n${lint.stderr}`);
 }
 
-console.log(
-  'demo:check passed: fixture scores and report lines match the README contract.',
-);
+console.log('demo:check passed: fixture scores and report lines match the README contract.');

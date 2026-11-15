@@ -1,2 +1,11 @@
 allowBuilds:
   esbuild: true
+
+# Supply-chain policy: only install versions published at least a day ago (minutes).
+# Matches pnpm 11's default, written down so every machine and CI agree.
+minimumReleaseAge: 1440
+
+# AutoRatchet is this guide's own tool, released from github.com/jagreehal/autoratchet
+# with npm provenance; take new releases straight away.
+minimumReleaseAgeExclude:
+  - autoratchet

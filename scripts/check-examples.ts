@@ -16,8 +16,12 @@ const actual = { scores, ratchets: ratchets.map(({ report: _report, ...r }) => r
 
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
   console.error('examples drifted from examples/expected-results.json.');
-  console.error('Run `pnpm examples` to see current scores, then update the README and `pnpm examples:write`.');
-  console.error(`expected:\n${JSON.stringify(expected, null, 2)}\n\nactual:\n${JSON.stringify(actual, null, 2)}`);
+  console.error(
+    'Run `pnpm examples` to see current scores, then update the README and `pnpm examples:write`.',
+  );
+  console.error(
+    `expected:\n${JSON.stringify(expected, null, 2)}\n\nactual:\n${JSON.stringify(actual, null, 2)}`,
+  );
   process.exit(1);
 }
 

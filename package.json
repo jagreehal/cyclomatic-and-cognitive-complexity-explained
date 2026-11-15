@@ -1,36 +1,32 @@
 {
   "name": "cyclomatic-and-cognitive-complexity-explained",
-  "version": "0.1.0",
-  "description": "A runnable guide to complexity gates for TypeScript and JavaScript: why Oxlint bulk suppressions miss regressions, when to override the linter, and a ratchet that gates on cyclomatic and cognitive complexity per function.",
+  "version": "0.0.0",
   "private": true,
+  "description": "A runnable guide to cyclomatic and cognitive complexity, complexity gates on legacy codebases, false positives, refactoring, and how gates get gamed. The tool lives at https://github.com/jagreehal/autoratchet.",
   "type": "module",
   "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=24"
   },
-  "bin": {
-    "complexity-ratchet": "./bin/complexity-ratchet.mjs"
-  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc",
-    "complexity-ratchet": "tsx src/cli.ts",
+    "autoratchet": "autoratchet",
     "demo:oxlint-baseline": "tsx scripts/demo-oxlint-baseline.ts",
-    "demo:ratchet-fail": "tsx scripts/expect-exit.ts 1 tsx src/cli.ts compare --base fixtures/base --head fixtures/head-fail",
-    "demo:ratchet-pass": "tsx src/cli.ts compare --base fixtures/base --head fixtures/head-pass",
+    "demo:ratchet-fail": "tsx scripts/expect-exit.ts 1 autoratchet compare --base fixtures/base --head fixtures/head-fail",
+    "demo:ratchet-pass": "autoratchet compare --base fixtures/base --head fixtures/head-pass",
     "demo:check": "tsx scripts/demo-check.ts",
     "examples": "tsx scripts/run-examples.ts",
     "examples:write": "tsx scripts/run-examples.ts --write",
     "examples:check": "tsx scripts/check-examples.ts"
   },
   "dependencies": {
-    "@biomejs/biome": "2.6.7",
-    "oxc-parser": "0.158.0",
-    "oxlint": "^1.93.0",
-    "tsx": "^4.23.15"
+    "autoratchet": "^0.1.0",
+    "oxlint": "^1.93.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }

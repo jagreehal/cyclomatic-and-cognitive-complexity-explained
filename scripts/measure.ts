@@ -9,11 +9,11 @@ import {
   assignCognitive,
   COMPLEXITY_RE,
   functionNameAt,
+  parseFunctionName,
   runBiomeCognitive,
   runOxlint,
   type FunctionSpan,
-} from '../src/collect.js';
-import { parseFunctionName } from '../src/identity.js';
+} from 'autoratchet/internals';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,12 +27,12 @@ export type Measurement = {
 
 type Scored = { at: string; span: FunctionSpan; score: number; name?: string };
 
-function oxlintScores(dir: string, config: string): Scored[] {
+function oxlintScores(dir: string, config?: string): Scored[] {
   return runOxlint([dir], config).flatMap((d) => {
     const match = d.message.match(COMPLEXITY_RE);
     const span = d.labels?.[0]?.span;
     if (!match?.groups || !d.filename || span?.line === undefined) return [];
-    const file = path.resolve(root, d.filename);
+    const file = d.filename; // absolute: runOxlint resolves it
     const name =
       (span.offset === undefined ? undefined : functionNameAt(file, span.offset)) ??
       parseFunctionName(match.groups.label);
@@ -52,8 +52,12 @@ export function measureDirectory(dir: string): Measurement[] {
   const classic = new Map(
     oxlintScores(abs, path.join(root, 'config/oxlint-classic.json')).map((s) => [s.at, s.score]),
   );
-  const modified = oxlintScores(abs, path.join(root, 'config/oxlint-cyclomatic.json'));
-  const { scores: cognitive } = assignCognitive(modified.map((s) => s.span), runBiomeCognitive([abs]));
+  // No config: AutoRatchet's own collector config, the modified variant the ratchet enforces.
+  const modified = oxlintScores(abs);
+  const { scores: cognitive } = assignCognitive(
+    modified.map((s) => s.span),
+    runBiomeCognitive([abs]),
+  );
 
   return modified.flatMap((s, i) =>
     s.name === undefined

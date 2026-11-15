@@ -1,10 +1,24 @@
-name: ci
+name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  demo:
+  guide:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -15,12 +29,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm test # the refactoring examples keep their behaviour
 
-      # The fixtures, examples, and quoted report lines must stay honest, or the README lies.
+      # The README quotes these numbers and reports. If one drifts, the build fails.
       - run: pnpm demo:check
       - run: pnpm examples:check
       - run: pnpm demo:oxlint-baseline
       - run: pnpm demo:ratchet-fail
       - run: pnpm demo:ratchet-pass
-      - run: shellcheck agent-hooks/claude-code/complexity-check.sh
