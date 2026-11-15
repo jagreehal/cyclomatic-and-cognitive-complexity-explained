@@ -1,61 +1,116 @@
 # Cyclomatic and cognitive complexity, explained
 
-**Oxlint bulk suppressions stayed green. `processPayment` went from 19 to 24 paths, and nobody noticed.**
+**A runnable guide to measuring how complicated your TypeScript and JavaScript
+functions are, and stopping them getting worse, from your first `if` to a CI gate
+for coding agents.**
 
-A pull request adds express delivery. It touches `processPayment` in five places,
-one `if (payment.express)` per branch. The diff adds six lines. Each one reads
-fine on its own. The reviewer approves it, and CI passes.
+Code rarely becomes hard to work with in one go. It happens one small, reasonable
+change at a time. Each new `if` looks harmless in review. A year later one function
+has two dozen ways through it, nobody can hold all of them in their head, and every
+change risks breaking a case nobody remembered to test.
 
-`processPayment` had 19 independent paths through it before the PR and 24 after.
-Its reading cost, measured as cognitive complexity, went from 28 to 38. Your
-quality gate has a complexity rule switched on, and it still passed, because the
-gate counted *how many* functions break the limit, and that number did not move.
+You can measure that drift. Two numbers do most of the work:
 
-This repo is that pull request, checked in and runnable, plus a small tool that
-catches it. The tool gates every function on two scores: how many paths it has
-(cyclomatic) and how hard it is to read (cognitive). You need both, and the page
-shows a regression each one misses on its own. It also covers the cases where the
-tool is wrong: functions that score high, read fine, and deserve an override.
+- **Cyclomatic complexity** counts the separate paths through a function. It tells
+  you how many tests you need to try every path.
+- **Cognitive complexity** scores how hard a function is to read, and it climbs
+  fastest when code nests `if` inside `if` inside `if`.
 
-Two gates look at the same pull request:
+This guide teaches both from scratch, then shows how to use them as a check that
+runs on every code change, on a codebase that already has complicated code in it,
+without stopping work to clean everything up first. Every number on the page comes
+from code in this repo that you can run yourself.
 
-| Gate | What it tracks | Result on the express-delivery PR |
-|------|----------------|-----------------------------------|
-| Oxlint bulk suppressions | Number of violations per file | **Pass** for `payments.ts` |
-| Function-level complexity ratchet | Each function's cyclomatic and cognitive score against the target branch | **Fail** |
+## Why this matters: a change that looked fine
 
-Every number on this page comes from a command you can run. CI re-measures all
-of them, so the page fails the build if it drifts from the code.
+A team keeps its payment logic in a function called `processPayment`. It decides
+what happens to a payment (refund, review, approve) by asking a series of yes/no
+questions: is the customer a VIP, is it international, is it flagged for fraud.
 
-## Who this is for
+A developer opens a **pull request** (a proposed change, reviewed before it joins
+the main code) to add express delivery. It adds one line,
+`if (payment.express) …`, in five places inside `processPayment`. Each line reads
+fine on its own. The reviewer approves it.
 
-You have written code with an `if` in it. That covers everyone from a first-year
-developer to a staff engineer, and the page is ordered for that range:
+The team also runs **CI** (continuous integration: a server that checks every pull
+request automatically) with a **linter** (a tool that reads code and reports
+problems) and a complexity rule switched on. CI passes.
 
-1. **Part 1** explains what the two metrics count, with a table of every
-   construct and its cost. Start here if "cyclomatic" means nothing to you.
-2. **Why you need both** shows a regression each metric misses alone.
-3. **Part 2** shows why the usual way of adding a complexity gate to an old
-   codebase misses regressions, and what to use instead.
-4. **Part 3** covers false positives: high scores you should accept, and how to
-   override the linter without opening a loophole.
-5. **Part 4** is a refactoring toolkit for the scores you should not accept.
-6. **Part 5** shows how the better gate still gets gamed.
-7. **Part 6** is the full setup for your own project, step by step, including
-   rules and Claude Code hooks for coding agents.
+Yet `processPayment` went from **19 paths to 24**, and its reading cost went from
+**28 to 38**. Five more cases now need tests, and the function got noticeably
+harder to follow.
 
-### Run the demos
+CI missed it because of how the team adopted the rule. Their old code already had
+functions over the limit, so they recorded those existing failures as accepted
+(**bulk suppressions**). From then on, the linter only checked whether the *number*
+of over-limit functions in each file went up. `processPayment` was already over
+the limit, so it could get worse forever without changing the count.
 
-You need [Node 24](https://nodejs.org/) and [pnpm](https://pnpm.io/installation)
-(`corepack enable` turns pnpm on if your Node came with Corepack). Then:
+This repo contains that exact pull request, plus a small tool, a **ratchet**, that
+catches it. A ratchet compares every function's scores with the same function on
+the main branch. A function may get better or stay the same. It may not get worse.
+
+| Check | What it compares | Result on the express-delivery PR |
+|-------|------------------|-----------------------------------|
+| Oxlint bulk suppressions | How many functions per file are over the limit | **Pass** for `payments.ts` |
+| Complexity ratchet (this repo) | Each function's two scores, before and after | **Fail**: `processPayment` got worse on both |
+
+## What you will learn
+
+1. **What the two scores count** (Part 1): a table of every JavaScript construct
+   and what it costs, and how to count a function by hand.
+2. **Why you need both scores** (next section): a real change each one misses on
+   its own.
+3. **How to gate an existing codebase** (Part 2): why "count the failures" misses
+   regressions, and how the ratchet works.
+4. **When the score is wrong** (Part 3): functions that score high but read fine,
+   and how to override the linter without hiding real problems.
+5. **How to fix a function that is too complex** (Part 4): six refactoring
+   techniques, beginner to advanced, each with before/after scores and a test
+   proving the behaviour did not change.
+6. **How the check gets gamed** (Part 5): three tricks that make the numbers look
+   better while the code gets worse, and what catches them.
+7. **How to set it all up** (Part 6): install, configure, CI, and hooks that make
+   AI coding agents follow the same rules.
+
+New to the subject? Read Part 1 and "Why you need both", then skip to Part 4. Setting
+this up for a team? Parts 2, 3, 5 and 6 are for you.
+
+## Words you will meet
+
+| Term | Meaning |
+|------|---------|
+| Function | A named block of code, such as `function processPayment(...) { ... }` |
+| Branch / path | A route through a function. Every `if` creates a fork: one path where the condition is true, one where it is false |
+| Linter | A tool that reads code without running it and reports problems. This repo uses [Oxlint](https://oxc.rs/docs/guide/usage/linter) and [Biome](https://biomejs.dev/) |
+| Rule | One check a linter runs, such as "no function over complexity 10" |
+| Threshold | The limit a rule enforces: 10 for cyclomatic and 15 for cognitive in this guide |
+| Pull request (PR) | A proposed change, reviewed before it merges into the main branch |
+| Target branch | The branch a pull request merges into, usually `main` |
+| CI | Continuous integration: a server that runs checks on every pull request and blocks it if one fails |
+| Quality gate | A check in CI that must pass before code can merge |
+| Bulk suppressions | A file listing the rule failures that existed when you turned a rule on, so the linter only fails on new ones |
+| Ratchet | A gate that allows a score to improve or stay the same, never to get worse |
+| Regression | A change that makes something worse. Here: a function's score went up |
+| False positive | A rule failure on code that is fine as written |
+| Override | A comment that switches a rule off for one function, such as `// oxlint-disable-next-line complexity` |
+| Refactor | Changing how code is written without changing what it does |
+| Coding agent | An AI tool that writes and edits code, such as Claude Code |
+| Hook | A script a coding agent runs automatically, for example after every file edit |
+
+## Run the demos
+
+You need [Node.js 24 or newer](https://nodejs.org/) and
+[pnpm](https://pnpm.io/installation). If your Node came with Corepack,
+`corepack enable` turns pnpm on. Then:
 
 ```bash
 git clone https://github.com/jagreehal/cyclomatic-and-cognitive-complexity-explained.git
 cd cyclomatic-and-cognitive-complexity-explained
 pnpm install               # installs Oxlint, Biome and the ratchet's other dependencies
 pnpm examples              # every measurement on this page
-pnpm demo:oxlint-baseline  # suppressions stay green on the bad PR
-pnpm demo:ratchet-fail     # the ratchet catches it
+pnpm demo:oxlint-baseline  # bulk suppressions pass the express-delivery PR
+pnpm demo:ratchet-fail     # the ratchet fails it
 ```
 
 No accounts and no network calls after install. To use the ratchet in your own
@@ -973,7 +1028,7 @@ fails on every legacy function. The ratchet only fails on what a PR made worse.
 
 ### Step 1: Install
 
-You need Node 24 (what this repo's CI tests) and pnpm. With npm, replace
+You need Node.js 24 or newer and pnpm. With npm, replace
 `pnpm add -D` with `npm install -D`.
 
 ```bash
@@ -1074,11 +1129,11 @@ jobs:
   ratchet:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the target branch must exist locally
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
