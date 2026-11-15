@@ -5,9 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory } from '../src/collect.js';
-import { comparePaths, verdict } from '../src/compare.js';
-import { formatReport } from '../src/report.js';
+import { collectFromDirectory, comparePaths, formatReport, verdict } from 'autoratchet';
 import { measureDirectory } from './measure.js';
 
 export const scoreExamples = [
@@ -77,7 +75,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { scores, ratchets } = await measureExamples();
 
   console.log('# Example measurements\n');
-  console.log('modified = Oxlint modified cyclomatic (enforced), cognitive = Biome (enforced), classic = Oxlint classic (comparison only)\n');
+  console.log(
+    'modified = Oxlint modified cyclomatic (enforced), cognitive = Biome (enforced), classic = Oxlint classic (comparison only)\n',
+  );
   let current = '';
   for (const row of scores) {
     if (row.example !== current) {

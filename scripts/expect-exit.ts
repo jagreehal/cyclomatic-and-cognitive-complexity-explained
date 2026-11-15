@@ -19,8 +19,6 @@ const result = spawnSync(command, args, {
 
 const actual = result.status ?? 1;
 if (actual !== expected) {
-  console.error(
-    `Expected exit code ${expected}, got ${actual} (${command} ${args.join(' ')})`,
-  );
+  console.error(`Expected exit code ${expected}, got ${actual} (${command} ${args.join(' ')})`);
   process.exit(1);
 }

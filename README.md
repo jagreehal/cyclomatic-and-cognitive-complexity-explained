@@ -47,8 +47,9 @@ functions over the limit, so they recorded those existing failures as accepted
 of over-limit functions in each file went up. `processPayment` was already over
 the limit, so it could get worse forever without changing the count.
 
-This repo contains that exact pull request, plus a small tool, a **ratchet**, that
-catches it. The ratchet compares every function's scores with the same function on
+This repo contains that exact pull request, and shows how a **ratchet** catches it,
+using [AutoRatchet](https://github.com/jagreehal/autoratchet), the open-source tool built
+from this guide. A ratchet compares every function's scores with the same function on
 the main branch and applies three rules: a function already over the limit may not
 get worse, a function under the limit may grow up to it, and a new function must
 stay under it. Because the main branch is the baseline, every improvement becomes
@@ -57,7 +58,7 @@ the function's new ceiling (never lower than the threshold).
 | Check | What it compares | Result on the express-delivery PR |
 |-------|------------------|-----------------------------------|
 | Oxlint bulk suppressions | How many functions per file are over the limit | **Pass** for `payments.ts` |
-| Complexity ratchet (this repo) | Each function's two scores, before and after | **Fail**: `processPayment` got worse on both |
+| AutoRatchet | Each function's two scores, before and after | **Fail**: `processPayment` got worse on both |
 
 ## What you will learn
 
@@ -118,7 +119,8 @@ pnpm demo:ratchet-fail     # the ratchet fails it
 ```
 
 No accounts and no network calls after install. To use the ratchet in your own
-project, skip to [Part 6](#part-6-the-full-setup).
+project, install [AutoRatchet](https://github.com/jagreehal/autoratchet), or read
+[Part 6](#part-6-the-full-setup) for the full setup.
 
 ---
 
@@ -544,7 +546,7 @@ and **15** for cognitive:
 4. When a function improves, the improvement becomes its new limit, because the
    next PR compares against the improved version on the target branch.
 
-The whole policy is one line, in `src/gate.ts`, run once per metric:
+The whole policy is one line in AutoRatchet's `src/gate.ts`, run once per metric:
 
 ```ts
 export function passesComplexityGate(
@@ -589,7 +591,7 @@ The ratchet needs no baseline file at all. The target branch *is* the baseline.
 ### More ratchet scenarios
 
 Each folder has a `base` and a `head`. Run any of them with
-`pnpm complexity-ratchet compare --base examples/<name>/base --head examples/<name>/head`.
+`pnpm autoratchet compare --base examples/<name>/base --head examples/<name>/head`.
 
 | Example | Function | Cyclomatic | Cognitive | Gate |
 |---------|----------|-----------:|----------:|------|
@@ -756,7 +758,7 @@ The rules:
 At the ratchet, the false positive fails the build:
 
 ```bash
-pnpm complexity-ratchet compare \
+pnpm autoratchet compare \
   --base examples/19-ratchet-false-positive/base \
   --head examples/19-ratchet-false-positive/head
 ```
@@ -775,7 +777,7 @@ With the override, it passes, and the report names the function, the metric,
 the approved score and the reason, so a reviewer can accept or reject it:
 
 ```bash
-pnpm complexity-ratchet compare \
+pnpm autoratchet compare \
   --base examples/20-ratchet-override/base \
   --head examples/20-ratchet-override/head
 ```
@@ -1042,8 +1044,10 @@ New overrides need approval (--require-override-approval):
 Quality gate failed.
 ```
 
-Part 6, Step 4 shows how to drop the flag only when someone with the right
-permissions approves the PR, using a protected label.
+AutoRatchet's GitHub Action drops the flag only once someone other than the PR author,
+with write access, approves the exact commit being merged (`override-approval: review`).
+Part 6, Step 3 shows the setup, and what else to protect so the author cannot grant the
+approval themselves.
 
 ### Slicing
 
@@ -1143,36 +1147,34 @@ Two things close most of the gap:
 
 ## Part 6: The full setup
 
-Four layers, each with one job. All of them use both metrics.
+The ratchet from this guide is a tool you can install:
+**[AutoRatchet](https://github.com/jagreehal/autoratchet)**. Its README is the reference for
+every option. This part is the short path, with the reasoning from Parts 1 to 5.
 
 | Layer | Tool | What it does | Fails CI? |
 |-------|------|--------------|-----------|
 | 1. Editor | Oxlint (cyclomatic) and Biome (cognitive), set to `warn` | Underlines a complex function while you type | No |
-| 2. Pull request gate | `complexity-ratchet` | Compares every function's two scores with the target branch | **Yes** |
-| 3. Review | The ratchet's report | Lists each new override as an approval (function, metric, score, reason) and any function that went missing | No: a person decides |
-| 4. Coding agents | Agent instructions, plus Claude Code hooks that run the ratchet on every edit | Catches a regression, or a new override, in the same turn the agent wrote it | No: it blocks the agent, not CI |
+| 2. Pull request gate | AutoRatchet's GitHub Action | Compares every function's two scores with the PR's base | **Yes** |
+| 3. Review | AutoRatchet's PR comment | Lists regressions, approvals (new overrides) and missing functions | No: a person decides |
+| 4. Coding agents | Agent instructions, plus AutoRatchet's Claude Code hooks | Catches a regression, or a new override, in the same turn the agent wrote it | No: it blocks the agent, not CI |
 
-The linters run at `warn` because the ratchet is the gate. A linter at `error`
-fails on every legacy function. The ratchet only fails on what a PR made worse.
+The linters run at `warn` because the ratchet is the gate. A linter at `error` fails on every
+legacy function. The ratchet only fails on what a PR made worse.
 
-### Step 1: Install
+### Step 1: Install AutoRatchet and try it
 
-You need Node.js 24 or newer and pnpm. With npm, replace
-`pnpm add -D` with `npm install -D`.
+You need Node.js 24 or newer.
 
 ```bash
-# The linters, for your editor and local runs
-pnpm add -D oxlint @biomejs/biome
-
-# The ratchet. It is not on npm; install it from GitHub.
-pnpm add -D github:jagreehal/cyclomatic-and-cognitive-complexity-explained
+npm install -D autoratchet
+npx autoratchet check --base main          # your working tree against merge-base(main, HEAD)
+npx autoratchet check --base main src      # pathspecs limit what is measured
 ```
 
-The ratchet ships its own pinned copies of Oxlint and Biome, and its own collector
-config. That keeps base and head measured by identical tools, whichever versions
-your project uses, and your lint config cannot change what the gate counts.
+AutoRatchet ships its own pinned Oxlint and Biome, so base and head are always measured by the
+same tools, whatever versions your project uses.
 
-### Step 2: Configure the linters
+### Step 2: Configure the linters for your editor
 
 `.oxlintrc.json` in your project root:
 
@@ -1220,112 +1222,53 @@ the config files above.
 
 On ESLint instead of Oxlint? The same two rules exist as `complexity` (core) and
 `sonarjs/cognitive-complexity` (`eslint-plugin-sonarjs`). Use them for editor
-feedback. The ratchet uses its own Oxlint and Biome either way.
+feedback. AutoRatchet uses its own pinned Oxlint and Biome either way.
 
-### Step 3: Try the ratchet locally
-
-The ratchet compares two directories. Check out your main branch beside your
-working copy and compare:
-
-```bash
-git worktree add ../base main
-pnpm complexity-ratchet compare --base ../base/src --head src
-git worktree remove ../base
-```
-
-Point both flags at the same folder in each tree: `src`, `packages/api/src`, or
-whatever holds your source. The ratchet measures every `.ts`, `.tsx`, `.js` and
-`.jsx` file under it, so pick a folder without generated code.
-
-Options:
-
-| Flag | Default | Meaning |
-|------|--------:|---------|
-| `--threshold` | 10 | Maximum cyclomatic score for new functions |
-| `--cognitive-threshold` | 15 | Maximum cognitive score for new functions |
-| `--require-override-approval` | off | A new override fails the gate instead of approving a score (Step 4) |
-
-The command has three outcomes, and only the first one passes:
-
-| Outcome | Exit code |
-|---------|----------:|
-| Every function measured, no regressions | 0 |
-| Every function measured, at least one regression (or a blocked override in strict mode) | 1 |
-| Something could not be measured: a file that does not parse, a function the collector cannot name, a cognitive score it cannot place | 3 |
-
-Exit code 2 means bad arguments, and 4 means the tool itself failed. Treat any
-non-zero code as a failure. An unmeasured function is not evidence that the
-function is fine, so the gate fails closed.
-
-### Step 4: Gate pull requests in CI
-
-`.github/workflows/complexity.yml`:
+### Step 3: Gate pull requests
 
 ```yaml
-name: complexity
-on: pull_request
+# .github/workflows/autoratchet.yml
+name: AutoRatchet
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   ratchet:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # the target branch must exist locally
-      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-
-      # Editor-level warnings, visible in the CI log. They never fail the job.
-      - run: pnpm oxlint src && pnpm biome lint src
-
-      # The gate: every function's two scores against the target branch.
-      # Pin the exact commit the PR targets, not a branch name that can move mid-run.
-      - run: git worktree add ../base ${{ github.event.pull_request.base.sha }}
-      - run: pnpm complexity-ratchet compare --base ../base/src --head src
+      - uses: jagreehal/autoratchet@v0.1.0
+        with:
+          path: src
+          override-approval: review
 ```
 
-The ratchet prints approvals (new overrides) and warnings (missing functions,
-file-wide overrides) in the same output. Ask reviewers to read that block on every
-PR that has one. Make the job a required status check, so a failure blocks merging.
+The action fails the check on a regression or an incomplete measurement, marks each regressed
+function in the diff, and keeps one comment on the PR. Make the job a required status check.
 
-#### Strict mode: overrides need an approval the author cannot grant
+`override-approval` decides who can approve a new override (Part 3):
 
-In the workflow above, anyone who can push a commit can add an override, and the
-gate accepts it. Agent hooks stop well-behaved agents, but a hook runs on the
-author's machine, so it is not an enforcement boundary. For that, run the gate
-with `--require-override-approval` and drop the flag only when a PR carries a
-label that the author cannot add:
+- `none`: the override approves its function's score, and the comment lists it for a reviewer.
+- `strict`: every new override fails the check.
+- `review`: a new override passes once someone other than the PR author, with write access,
+  approves the PR's current head commit. A new push needs a new approval.
+- `label`: the PR carries an approval label. Anyone with write access can add labels, the author
+  included, so this keeps out agents whose token cannot label, not people.
 
-```yaml
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+For an approval the author cannot grant themselves, use `review`, require a review from someone
+else on `main`, dismiss stale approvals when new commits arrive, and protect workflow files with
+CODEOWNERS.
 
-# … same steps as above, then replace the last step with:
-      - name: Complexity ratchet
-        env:
-          APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'complexity-override-approved') }}
-        run: |
-          if [ "$APPROVED" = "true" ]; then
-            pnpm complexity-ratchet compare --base ../base/src --head src
-          else
-            pnpm complexity-ratchet compare --base ../base/src --head src --require-override-approval
-          fi
-```
-
-For the label to mean anything:
-
-- Only people who can triage the repo can add labels. Keep coding agents and
-  their tokens below that permission.
-- A label covers every commit pushed to the PR after it was added. Re-read the
-  report on each push, or add a workflow that removes the label on `synchronize`.
-- The `labeled` and `unlabeled` types re-run the check when the label changes.
-
-### Step 5: Choose thresholds
+### Step 4: Choose thresholds
 
 - **Cyclomatic: 10.** McCabe proposed 10 in the original 1976 paper, and NIST's
   structured testing guidance (SP 500-235) uses the same figure. ESLint and Oxlint
@@ -1336,7 +1279,7 @@ The ratchet makes the exact numbers matter less than they seem. Existing functio
 keep their current scores as their limits. The thresholds only apply to new code
 and to functions crossing a limit for the first time.
 
-### Step 6: Tell your coding agents
+### Step 5: Tell your coding agents
 
 The ratchet works well with AI coding agents, because the rules run in CI rather
 than in the agent's judgement. Agents also find the Part 5 loopholes faster than
@@ -1366,78 +1309,20 @@ When you ask an agent for a refactor, name the function and the behaviour to
 keep: "Refactor `processPayment` into a decision table; keep every outcome the
 same." "Reduce complexity below 10" invites slicing and disable comments.
 
-### Step 7: Add Claude Code hooks
-
-Instructions ask. Hooks check. With the hooks below, Claude Code runs the ratchet
-itself while it works, so a regression comes back to the agent in the same turn,
-before you ever see the diff. They compare each changed file with its last
-committed version, using the ratchet you installed in Step 1.
-
-| Hook | When it runs | What it checks |
-|------|--------------|----------------|
-| `PostToolUse` | After every Edit or Write | The file Claude changed, in about a second |
-| `Stop` | When Claude is about to hand back | Every changed source file in the working tree |
-
-Each one blocks the agent (exit code 2, report on stderr) when:
-
-- a function over a limit got worse, or one under a limit crossed it,
-- a changed file cannot be measured (usually because it does not parse yet),
-- a new function is over a limit, or
-- the change adds a complexity override comment. Agents may not add those. If an
-  override is right, a person commits it, and the hook stops flagging it once
-  it is in `HEAD`.
-
-The hooks need `git` and [`jq`](https://jqlang.org/download/). Install them in your
-project:
+For Claude Code, AutoRatchet ships two hooks: one checks each file after an edit, the other
+checks every changed file before the agent finishes. Both block on regressions, on files that do
+not parse, and on new override comments, because an agent may not approve its own exception:
 
 ```bash
 mkdir -p .claude/hooks
-cp node_modules/cyclomatic-and-cognitive-complexity-explained/agent-hooks/claude-code/complexity-check.sh .claude/hooks/
+cp node_modules/autoratchet/agent-hooks/claude-code/complexity-check.sh .claude/hooks/
+cp node_modules/autoratchet/agent-hooks/claude-code/settings.json .claude/settings.json  # or merge its "hooks" block
 ```
 
-Then add the `hooks` block from
-`node_modules/cyclomatic-and-cognitive-complexity-explained/agent-hooks/claude-code/settings.json`
-to your `.claude/settings.json`. If you do not have that file yet, copy it across:
+Hooks run on the author's machine, so they are a fast feedback loop. The CI check is the
+enforcement.
 
-```bash
-cp node_modules/cyclomatic-and-cognitive-complexity-explained/agent-hooks/claude-code/settings.json .claude/settings.json
-```
-
-Commit both files so everyone on the team, and every agent session, gets the
-checks. Run `/hooks` in Claude Code to confirm it loaded them.
-
-This is what Claude sees after an edit that makes `processPayment` worse:
-
-```text
-Complexity check failed:
-Complexity regressions detected:
-
-src/payments.ts
-  processPayment
-    cyclomatic: 19 → 24 (+5)
-    cognitive: 28 → 38 (+10)
-  validateCustomer
-    cyclomatic: 12 → 13 (+1)
-
-Quality gate failed.
-
-Refactor so no function gets worse: guard clauses, a lookup table, a switch over a union, named predicates, or a decision table. Do not split a function at an arbitrary point.
-```
-
-Details worth knowing:
-
-- **No loops.** If Claude still cannot pass the `Stop` check after one attempt, the
-  hook reports the problem and lets it finish, so you see it instead of the agent
-  retrying forever.
-- **Your thresholds.** Set `COMPLEXITY_RATCHET_ARGS="--threshold 12 --cognitive-threshold 18"`
-  in the hook's environment to match your CI.
-- **Skipped paths.** `node_modules`, `dist`, `build`, `coverage`, `generated`
-  folders and `.d.ts` files. Edit `is_source` in the script to change that.
-- **Other agents.** The script reads Claude Code's hook JSON from stdin
-  (`tool_input.file_path`, `stop_hook_active`). Any agent with edit and stop hooks
-  can call it the same way.
-
-### Step 8: Track the trend
+### Step 6: Track the trend
 
 Averages hide the function that matters. Put these on a dashboard instead, for
 both metrics:
@@ -1447,47 +1332,23 @@ both metrics:
 - Total excess above the threshold
 - Overrides: how many exist, and their reasons
 
----
-
 ## How this repo works
 
-For each tree, the CLI runs Oxlint with `max: 0`, so every function produces a
-diagnostic with its cyclomatic score, and Biome with a maximum of 1, so every
-function scoring 2 or more reports its cognitive score. Both run on a copy of the
-code with disable comments defused, so overrides never hide a score. It pairs
-each Biome score with the Oxlint function whose source range contains it, names
-each function with `oxc-parser` (`relative/path::PaymentService.validate`), and
-compares the base map with the head map. New override comments become approvals
-for one function and one metric, listed in the report, or failures under
-`--require-override-approval`. Anything it cannot measure (a file that does not
-parse, a score it cannot pair with a named function) fails the run with exit
-code 3.
-
-```mermaid
-flowchart LR
-  base[Target branch] --> A[Oxlint: cyclomatic<br/>Biome: cognitive]
-  head[Pull request] --> B[Oxlint: cyclomatic<br/>Biome: cognitive]
-  A --> C[Two scores per function]
-  B --> C
-  C --> D{Any function worse on either,<br/>or new and over a limit?}
-  D -->|yes| F[Fail]
-  D -->|no| P[Pass]
-  C --> W[Report: approvals from new overrides,<br/>missing functions]
-```
+Every number on this page comes from [AutoRatchet](https://github.com/jagreehal/autoratchet),
+installed as a dependency. `scripts/measure.ts` adds the classic cyclomatic column for Part 1,
+which AutoRatchet does not enforce. The examples and fixtures are deliberately complex teaching
+material.
 
 ```bash
-pnpm complexity-ratchet compare --base fixtures/base --head fixtures/head-fail
-pnpm complexity-ratchet compare --base fixtures/base --head fixtures/head-fail --threshold 15 --cognitive-threshold 20
+pnpm autoratchet compare --base fixtures/base --head fixtures/head-fail
+pnpm autoratchet compare --base examples/24-ratchet-nesting/base --head examples/24-ratchet-nesting/head
 ```
-
-The demos compare fixture folders so the results stay deterministic. Comparing
-two checkouts of the same repo works the same way (Part 6, Step 3).
 
 ## Run everything
 
 ```bash
 pnpm install
-pnpm test                  # unit tests, plus the refactoring equivalence tests
+pnpm test                  # the refactoring examples keep their behaviour
 pnpm typecheck
 pnpm examples              # print every measurement on this page
 pnpm examples:check        # fail if any example drifted from expected-results.json
@@ -1502,36 +1363,21 @@ README, then `pnpm examples:write`.
 
 ## Limits
 
-- **Identity is `relative/path::qualified name`.** Moving a function to another
-  file, or renaming it, makes it look new, so it must pass the new-function
-  limits. Callbacks and unkeyed array entries are named by position
-  (`items.forEach()#2`, `RULES[3]`), so reordering them pairs a function with
-  another function's history. Keyed table entries do not have this problem.
-- **Biome never reports cognitive scores of 0 or 1**, so the ratchet records both
-  as 1. The examples tables show them as ≤1.
-- **The ratchet cannot judge an override's reason.** By default a new override
-  approves one function's current score on one metric, and the report lists it
-  for a reviewer, so a PR that adds both an Oxlint and a Biome override to the
-  same function passes. `--require-override-approval` turns every new override
-  into a failure; the approval then has to come from outside the PR (Step 4).
-- **The CLI compares directories or JSON snapshots.** It does not check out git
-  refs itself; Part 6 shows the `git worktree` step. A JSON snapshot without
-  cognitive scores skips the cognitive gate, and override approvals need
-  directories.
-- **The ratchet uses its own collector configs**, so your `ignorePatterns` do not
-  apply to it. Point it at folders without generated code.
-- **Class field initialisers that are not functions** (`x = a ? 1 : 2`) are not
-  measured. Oxlint scores them, but they belong to no function.
+AutoRatchet's README lists the tool's limits. The ones that matter for this guide:
+
+- Function identity is the file path plus a qualified name. Moving or renaming a function makes
+  it look new, and callbacks or unkeyed table entries are named by position.
+- Biome does not report cognitive scores of 0 or 1, so the tables show them as ≤1.
+- AutoRatchet cannot judge an override's reason. Part 5 shows what that allows, and Part 6 how
+  to require an approval the author cannot grant.
 
 ## Layout
 
 ```text
-src/                          the complexity-ratchet CLI: collect, functions (naming), gate, compare, overrides, report
+README.md                     this guide
 scripts/measure.ts            modified, classic and cognitive scores for the examples
-.oxlintrc.json                cyclomatic collector config (max 0: every function reports a score)
-config/biome-cognitive.json   cognitive collector config (max 1, Biome's lowest)
 config/oxlint-classic.json    classic-variant config, for the comparison column only
-oxlint.fixtures.json          the lint config a team would use (max 10)
+oxlint.fixtures.json          the lint config a team would use (max 10), for the suppressions demo
 fixtures/base                 the target branch from the opening story
 fixtures/head-fail            the express-delivery PR
 fixtures/head-pass            an improving PR
@@ -1540,11 +1386,9 @@ examples/01-07, 13-16         the pattern catalogue (Part 1)
 examples/08-12                ratchet scenarios (Part 2)
 examples/17-false-positives   high scores worth keeping (Part 3)
 examples/18-refactoring-toolkit + refactoring.test.ts   refactors with equivalence tests (Part 4)
-examples/19-20                a false positive at the gate, and its override (Part 3)
+examples/19-20, 25            a false positive at the gate, its override, and the override holding (Part 3)
 examples/21-23                loopholes: half closed, closed, still open (Part 5)
 examples/24-ratchet-nesting   the regression only cognitive catches (Why you need both)
-examples/25-ratchet-override-holds  an approved function that gets worse later still fails (Part 3)
-agent-hooks/claude-code/      Claude Code hooks that run the ratchet on every edit (Part 6, Step 7)
 examples/expected-results.json  every number on this page, checked in CI
 ```
 

@@ -1,5 +1,16 @@
+# dependencies
 node_modules/
-reports/
-.DS_Store
-coverage/
 .pnpm-store/
+
+# build output
+dist/
+
+# tests and reports
+coverage/
+reports/
+
+# editor, OS and tool state
+.DS_Store
+*.log
+*.tsbuildinfo
+.claude/
