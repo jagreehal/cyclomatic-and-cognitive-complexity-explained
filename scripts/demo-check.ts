@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory, comparePaths, formatReport, functionKey, verdict } from 'autoratchet';
+import { compare, measure, type Snapshot } from './autoratchet.js';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,16 +40,19 @@ const expectedHeadPass = {
   createOrder: 8,
 } as const;
 
+function find(snapshots: Snapshot[], filePath: string, name: string): Snapshot | undefined {
+  return snapshots.find((s) => s.filePath === filePath && s.functionName === name);
+}
+
 function assertScores(
   label: string,
-  snapshots: Map<string, { cyclomatic: number }>,
+  snapshots: Snapshot[],
   expected: Record<string, number>,
   filePath: string,
 ) {
   for (const [name, cyclomatic] of Object.entries(expected)) {
-    const key =
-      name === 'createRefund' ? functionKey('refunds.ts', name) : functionKey(filePath, name);
-    const actual = snapshots.get(key);
+    const key = `${name === 'createRefund' ? 'refunds.ts' : filePath}::${name}`;
+    const actual = find(snapshots, name === 'createRefund' ? 'refunds.ts' : filePath, name);
     if (!actual) throw new Error(`${label}: missing ${key}`);
     if (actual.cyclomatic !== cyclomatic) {
       throw new Error(`${label}: ${key} expected ${cyclomatic}, got ${actual.cyclomatic}`);
@@ -57,28 +60,24 @@ function assertScores(
   }
 }
 
-function assertCognitive(
-  label: string,
-  snapshots: Map<string, { cognitive?: number }>,
-  expected: Record<string, number>,
-) {
+function assertCognitive(label: string, snapshots: Snapshot[], expected: Record<string, number>) {
   for (const [name, cognitive] of Object.entries(expected)) {
-    const actual = snapshots.get(functionKey('payments.ts', name))?.cognitive;
+    const actual = find(snapshots, 'payments.ts', name)?.cognitive;
     if (actual !== cognitive) {
       throw new Error(`${label}: ${name} cognitive expected ${cognitive}, got ${actual}`);
     }
   }
 }
 
-const base = await collectFromDirectory(path.join(root, 'fixtures/base'));
+const base = measure(path.join(root, 'fixtures/base'));
 assertScores('base', base, expectedBase, 'payments.ts');
 assertCognitive('base', base, expectedCognitive.base);
 
-const headFail = await collectFromDirectory(path.join(root, 'fixtures/head-fail'));
+const headFail = measure(path.join(root, 'fixtures/head-fail'));
 assertScores('head-fail', headFail, expectedHeadFail, 'payments.ts');
 assertCognitive('head-fail', headFail, expectedCognitive.headFail);
 
-const headPass = await collectFromDirectory(path.join(root, 'fixtures/head-pass'));
+const headPass = measure(path.join(root, 'fixtures/head-pass'));
 assertScores('head-pass', headPass, expectedHeadPass, 'payments.ts');
 
 const suppressions = JSON.parse(
@@ -89,11 +88,10 @@ if (suppressions['payments.ts'].complexity.count !== 2) {
   throw new Error('suppressions complexity count must stay 2');
 }
 
-const failCompare = await comparePaths(
+const failReport = compare(
   path.join(root, 'fixtures/base'),
   path.join(root, 'fixtures/head-fail'),
-);
-const failReport = formatReport(failCompare);
+).report;
 for (const needle of [
   'processPayment\n    cyclomatic: 19 → 24 (+5)\n    cognitive: 28 → 38 (+10)',
   'validateCustomer\n    cyclomatic: 12 → 13 (+1)',
@@ -105,11 +103,8 @@ for (const needle of [
   }
 }
 
-const passCompare = await comparePaths(
-  path.join(root, 'fixtures/base'),
-  path.join(root, 'fixtures/head-pass'),
-);
-if (verdict(passCompare) !== 'pass') {
+const passCompare = compare(path.join(root, 'fixtures/base'), path.join(root, 'fixtures/head-pass'));
+if (passCompare.verdict !== 'pass') {
   throw new Error('head-pass must have zero regressions');
 }
 
