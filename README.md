@@ -87,7 +87,7 @@ this up for a team? Parts 2, 3, 5 and 6 are for you.
 |------|---------|
 | Function | A named block of code, such as `function processPayment(...) { ... }` |
 | Branch / path | A route through a function. Every `if` creates a fork: one path where the condition is true, one where it is false |
-| Linter | A tool that reads code without running it and reports problems. This repo uses [Oxlint](https://oxc.rs/docs/guide/usage/linter) and [Biome](https://biomejs.dev/) |
+| Linter | A tool that reads code without running it and reports problems. This repo uses [Oxlint](https://oxc.rs/docs/guide/usage/linter); [Biome](https://biomejs.dev/) is another |
 | Rule | One check a linter runs, such as "no function over complexity 10" |
 | Threshold | The limit a rule enforces: 10 for cyclomatic and 15 for cognitive in this guide |
 | Pull request (PR) | A proposed change, reviewed before it merges into the main branch |
@@ -112,7 +112,7 @@ You need [Node.js 24 or newer](https://nodejs.org/) and
 ```bash
 git clone https://github.com/jagreehal/cyclomatic-and-cognitive-complexity-explained.git
 cd cyclomatic-and-cognitive-complexity-explained
-pnpm install               # installs Oxlint, Biome and the ratchet's other dependencies
+pnpm install               # installs AutoRatchet and Oxlint
 pnpm examples              # every measurement on this page
 pnpm demo:oxlint-baseline  # bulk suppressions pass the express-delivery PR
 pnpm demo:ratchet-fail     # the ratchet fails it
@@ -200,7 +200,7 @@ number below comes from `pnpm examples`:
 | `switch` with 4 cases | `switch (n) { case 1: … }` | 2 | 5 | ≤1 |
 | Branch inside a callback | `values.map(v => v > 0 ? v : 0)` | 1 | 1 | ≤1 |
 
-Biome only reports cognitive scores above 1, so **≤1** means 0 or 1.
+AutoRatchet records cognitive scores of 0 and 1 as 1, so **≤1** means 0 or 1.
 
 Three rows surprise people:
 
@@ -295,9 +295,10 @@ The two metrics answer different questions:
 Where they disagree, look closer. Most false positives in Part 3 sit in exactly
 that gap: high cyclomatic, cognitive near zero.
 
-The ratchet in this repo enforces both. Oxlint supplies the cyclomatic score and
-[Biome](https://biomejs.dev/linter/rules/no-excessive-cognitive-complexity/)
-supplies the cognitive one, because Oxlint does not compute cognitive complexity.
+The ratchet in this repo enforces both. Oxlint supplies the cyclomatic score.
+Oxlint does not compute cognitive complexity, so AutoRatchet scores it itself,
+with the same rules as
+[Biome's linter](https://biomejs.dev/linter/rules/no-excessive-cognitive-complexity/).
 
 ### The full catalogue
 
@@ -389,7 +390,7 @@ gate approves it.
 | Ignores | Nesting | `?.`, `??`, defaults, runs of the same operator |
 | Typical false positive | Option defaults, `?.` chains (Part 3) | Rare. Flat checklists stay below 15 |
 | Default threshold here | 10 | 15 |
-| Tool | Oxlint `complexity` (`variant: "modified"`) | Biome `noExcessiveCognitiveComplexity` |
+| Tool | Oxlint `complexity` (`variant: "modified"`) | Biome `noExcessiveCognitiveComplexity`, or AutoRatchet, which scores the same way |
 
 Readability is the property you feel every day, so if you only look at one
 number, look at cognitive. Gate on both: cognitive keeps the code readable, and
@@ -736,6 +737,10 @@ export function createChart({ ... }) {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: follows the RFC 3986 parsing steps in order
 export function parseUri(...) {
 ```
+
+AutoRatchet also reads the ESLint name for the cognitive rule:
+`// eslint-disable-next-line sonarjs/cognitive-complexity -- <reason>`. Name both rules,
+comma-separated, to cover both scores.
 
 You will write the first kind far more often. Cyclomatic false positives come
 from cheap syntax (`?.`, `??`, defaults). Cognitive skips that syntax, so a high
@@ -1171,8 +1176,8 @@ npx autoratchet check --base main          # your working tree against merge-bas
 npx autoratchet check --base main src      # pathspecs limit what is measured
 ```
 
-AutoRatchet ships its own pinned Oxlint and Biome, so base and head are always measured by the
-same tools, whatever versions your project uses.
+AutoRatchet ships its own pinned Oxlint and scores cognitive complexity itself, so base and head
+are always measured the same way, whatever versions your project uses.
 
 ### Step 2: Configure the linters for your editor
 
@@ -1222,7 +1227,7 @@ the config files above.
 
 On ESLint instead of Oxlint? The same two rules exist as `complexity` (core) and
 `sonarjs/cognitive-complexity` (`eslint-plugin-sonarjs`). Use them for editor
-feedback. AutoRatchet uses its own pinned Oxlint and Biome either way.
+feedback. AutoRatchet measures with its own pinned Oxlint and cognitive scorer either way.
 
 ### Step 3: Gate pull requests
 
@@ -1246,7 +1251,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: jagreehal/autoratchet@v0.1.0
+      - uses: jagreehal/autoratchet@v0.2.0
         with:
           path: src
           override-approval: review
@@ -1367,7 +1372,7 @@ AutoRatchet's README lists the tool's limits. The ones that matter for this guid
 
 - Function identity is the file path plus a qualified name. Moving or renaming a function makes
   it look new, and callbacks or unkeyed table entries are named by position.
-- Biome does not report cognitive scores of 0 or 1, so the tables show them as ≤1.
+- Cognitive scores of 0 and 1 are both recorded as 1, so the tables show them as ≤1.
 - AutoRatchet cannot judge an override's reason. Part 5 shows what that allows, and Part 6 how
   to require an approval the author cannot grant.
 

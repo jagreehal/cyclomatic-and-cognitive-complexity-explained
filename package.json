@@ -21,7 +21,7 @@
     "examples:check": "tsx scripts/check-examples.ts"
   },
   "dependencies": {
-    "autoratchet": "^0.1.0",
+    "autoratchet": "^0.2.0",
     "oxlint": "^1.93.0"
   },
   "devDependencies": {

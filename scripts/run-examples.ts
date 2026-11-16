@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectFromDirectory, comparePaths, formatReport, verdict } from 'autoratchet';
+import { compare, measure } from './autoratchet.js';
 import { measureDirectory } from './measure.js';
 
 export const scoreExamples = [
@@ -51,13 +51,13 @@ export async function measureExamples() {
 
   const ratchets = [];
   for (const example of ratchetExamples) {
-    const result = await comparePaths(
+    const result = compare(
       path.join(examplesRoot, example, 'base'),
       path.join(examplesRoot, example, 'head'),
     );
     ratchets.push({
       example,
-      pass: verdict(result) === 'pass',
+      pass: result.verdict === 'pass',
       regressions: result.regressions.map((r) => ({
         functionName: r.functionName,
         metric: r.metric,
@@ -65,7 +65,7 @@ export async function measureExamples() {
         current: r.current,
         kind: r.kind,
       })),
-      report: formatReport(result),
+      report: result.report,
     });
   }
   return { scores, ratchets };
@@ -76,7 +76,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
   console.log('# Example measurements\n');
   console.log(
-    'modified = Oxlint modified cyclomatic (enforced), cognitive = Biome (enforced), classic = Oxlint classic (comparison only)\n',
+    'modified = Oxlint modified cyclomatic (enforced), cognitive = AutoRatchet (enforced), classic = Oxlint classic (comparison only)\n',
   );
   let current = '';
   for (const row of scores) {
@@ -91,13 +91,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
   console.log('\n# Ratchet scenarios\n');
   for (const r of ratchets) {
-    const base = await collectFromDirectory(path.join(examplesRoot, r.example, 'base'));
-    const head = await collectFromDirectory(path.join(examplesRoot, r.example, 'head'));
+    const base = measure(path.join(examplesRoot, r.example, 'base'));
+    const head = measure(path.join(examplesRoot, r.example, 'head'));
     console.log(`## ${r.example} → ${r.pass ? 'PASS' : 'FAIL'}`);
-    const names = new Set([...base.values(), ...head.values()].map((s) => s.functionName));
+    const names = new Set([...base, ...head].map((s) => s.functionName));
     for (const name of [...names].sort()) {
-      const b = [...base.values()].find((s) => s.functionName === name);
-      const h = [...head.values()].find((s) => s.functionName === name);
+      const b = base.find((s) => s.functionName === name);
+      const h = head.find((s) => s.functionName === name);
       console.log(
         `- ${name}: cyclomatic ${b?.cyclomatic ?? 'new'} → ${h?.cyclomatic ?? 'gone'}, cognitive ${b?.cognitive ?? 'new'} → ${h?.cognitive ?? 'gone'}`,
       );
